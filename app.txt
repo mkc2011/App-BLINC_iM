@@ -1,0 +1,55 @@
+Input: Rotor Dia, WTG Coords
+Output: T0 Pos North of WTG +- 5m accuracy is OK
+
+After Placing the tracker:
+
+Input: Hub ctr (x,y,z)
+Output: Exact location of WTG 
+
+
+
+I enter a number rotor dia which is the distance im going to move according to formula 1.125D
+
+
+And it takes my coords current and draws straight line length = 1.125D and gives my new coords - at the end of the line = T0
+
+Just enter a coordinate and it gives another coordinate 1.125D meters opposite to the direction you are currently facing
+Then check if you've reached the correct position.
+
+
+After that enter the hub center, in x,y,z, this will be relative to the livox fov, Now give the correct posiiton to move right or left by x meters
+
+After this the system should self correct to the current position using the pan and tilt motor to align the hub ctr with the livox center
+
+
+Ok now facing the turbine normally, 
+give the sp1, sp2 ,sp3 and sp4 position coordinates
+plot a circle with 3*D and mark the scan positions
+
+sp1 : blade 3 o clock pos with horizontal middle
+sp2:  blade 3 o clock pos with horizontal middle, offset by 10 degree
+sp3: similar and opposite to sp1
+sp4: blade 9 o clock pos, opposite to sp2
+
+Give the coords for all of this 
+
+They should all change according to yaw with the turbine tower axis as axis of rotation, if the turbine yaw>+-10 deg
+
+
+
+
+Or Model the benewake, livox and camera FOVs
+
+
+Ok with the tower base as the center, and the rotor diameter i will give four position which are to be marked on the ground
+
+sp1: positive rotorDia/4 in the positive x direction in the x axis (
+
+
+
+Turbine facing x-axis
+
+SP1: (Rotor_Dia/4, Rotor_Dia*1.125, 0)
+SP2: (Rotor_Dia/4, Hub_ht*tan(theta), 0)
+SP3: (Rotor_Dia/4, -Rotor_Dia*1.125, 0)
+SP4: (Rotor_Dia/4, -Hub_ht*tan(theta), 0)
