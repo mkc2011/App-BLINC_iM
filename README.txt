@@ -26,14 +26,21 @@ Now assume i have a pan tilt setup with the tilt on top of the pan axis by offse
 our program and give me the value of the pan and tilt motors when aiming at the hub center. This should be dynamic, so the pan tilt angle toward the hub should update even if the 
 system pos is changed. The heirarchy of operations will be First - Pan, then followed by tilt, for aiming at each position.
 
+
+
 Now add another sensor
 Name: Livox
-FOV: 70.4 H X 77.2 V
+FOV: 70.4 degree H X 77.2 V degree
 Position: on top of the tracker above the laser sensor above the tilt motor
 It should also be aimed at the hub ctr...
 
 
 
+Scanner
+
+Name: Camera
+FOV: 70.4 degree H X 77.2 V degree
+Position: on top of the tracker above the laser sensor above the tilt motor
 
 
 
