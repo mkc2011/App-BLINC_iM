@@ -20,22 +20,34 @@ except Exception:
 yaw_deg = 0.0         # 0° means nacelle faces world +Y (kept by +pi/2 offset below)
 yaw_rate_deg_s = 0.0  # deg/s
 
-# SPs start rotated +270° at yaw=0 (your saved preference)
+# SPs start rotated +270° at yaw=0 (saved preference)
 sp_yaw_offset_deg = 270.0
 
 # --- Rotor control ---
 rotor_rpm = 12.0
 rot_dir   = -1.0      # +1=CCW about +X (looking forward), -1=CW
 
-# --- Geometry ---
-rotor_dia_m   = 36.0
-hub_ht_m      = 80.0   # informational; actual NACELLE TF uses tower_h below
-theta_deg_val = 10.0
+# --- Geometry (live-editable) ---
+rotor_dia_m   = 80.0     # <- change at runtime; scene will rebuild
+hub_ht_m      = 80.0     # tower/nacelle height (scene rebuilds)
+theta_deg_val = 10.0     # angle used by SP layout (scene rebuilds)
+
+
+# --- Blade sizing (relative to rotor diameter) ---
+blade_root_w_factor     = 0.02   # ~3% of rotor_dia_m at root (chord in Y)
+blade_tip_w_factor      = 0.01   # ~1% of rotor_dia_m at tip  (chord in Y)
+blade_thickness_factor  = 0.004  # ~0.4% of rotor_dia_m (thickness in X)
+
+# Derived blade dims (auto-update when rotor_dia_m changes)
+blade_root_w_m    = blade_root_w_factor * rotor_dia_m
+blade_tip_w_m     = blade_tip_w_factor  * rotor_dia_m
+blade_thickness_m = blade_thickness_factor * rotor_dia_m
+
 
 # Ground circle ring
 circle_ring_width_m = 0.6
 circle_segments     = 256
-circle_color        = Color(r=0.10, g=0.45, b=0.12, a=0.9)  # visible dark green
+circle_color        = Color(r=0.10, g=0.45, b=0.12, a=0.9)
 
 # SP bullseye styling
 marker_inner_r_m = 0.45
@@ -48,36 +60,32 @@ marker_color_red = Color(r=1.0, g=0.0, b=0.0, a=1.0)
 label_height_m   = 2.0
 label_offset_m   = 1.0
 label_font_size  = 1.2
-label_color      = Color(r=0.0, g=0.0, b=0.0, a=1.0)     # black text
-label_bg_color   = Color(r=1.0, g=1.0, b=1.0, a=1.0)     # white background
+label_color      = Color(r=0.0, g=0.0, b=0.0, a=1.0)
+label_bg_color   = Color(r=1.0, g=1.0, b=1.0, a=1.0)
 label_billboard  = True
-
-# Optional thin poles under labels (these yaw with SPs since they’re in SCAN)
-draw_label_poles    = True
+draw_label_poles = False
 label_pole_radius_m = 0.03
 
-# TRACKER marker (fixed in world)
+# TRACKER marker + mast (fixed in world)
 tracker_color_blue  = Color(r=0.0, g=0.35, b=1.0, a=1.0)
-tracker_ht_m        = 1.0   # TRACKER mast height above ground
-
-# TRACKER mast cylinder
+tracker_ht_m        = 1.0
 tracker_mast_radius_m = 0.30
-tracker_mast_color    = Color(r=0.0, g=0.0, b=0.0, a=1.0)  # opaque black
+tracker_mast_color    = Color(r=0.0, g=0.0, b=0.0, a=1.0)
 
-# --- Sensor FOV (anchored at TRACKER) ---
+# --- Tracker-mounted Sensor (PAN -> TILT -> SENSOR; +X is forward) ---
 sensor_enable            = True
 sensor_haov_deg          = 0.35   # Horizontal AOV (full angle)
 sensor_vaov_deg          = 0.15   # Vertical AOV (full angle)
-sensor_working_dist_m    = 120.0  # Far distance (extend length)
-sensor_near_m            = 0.20   # Small near plane to avoid degenerate apex
+sensor_far_m             = 120.0  # FOV length
+sensor_near_m            = 0.20   # near plane
 sensor_color             = Color(r=1.0, g=0.0, b=0.0, a=0.35)  # mild transparent red
 
-# Mechanical stack: PAN -> (offset) -> TILT -> (offset) -> SENSOR (+X forward)
-pan_to_tilt_offset   = (0.0, 0.05, 0.01)  # (x,y,z) in meters
-tilt_to_sensor_offset= (0.0, 0.0, 0.01)   # (x,y,z) in meters
+# Mechanical stack offsets
+pan_to_tilt_offset    = (0.0, 0.05, 0.01)   # (x,y,z) from PAN to TILT
+tilt_to_sensor_offset = (0.0, 0.00, 0.01)   # (x,y,z) from TILT to SENSOR
 
-# Targeting: aim at hub center plus optional vertical offset (meters)
-hub_target_z_offset_m = 0.0  # set to 20.0 to aim 20 m above hub center, etc.
+# Aim target: hub center + optional vertical offset (meters)
+hub_target_z_offset_m = 0.0
 
 # Frame names for sensor chain
 PAN, TILT, SENSOR = "pan_stage", "tilt_stage", "sensor_tracker"
@@ -160,7 +168,8 @@ def make_ground_circle_ring(frame_id: str, entity_id: str,
             tris += [oi, ii, ij]
     return SceneEntity(
         frame_id=frame_id, id=entity_id,
-        timestamp=now_ts(), lifetime=Duration.from_secs(0),
+        timestamp=now_ts(),
+        lifetime=Duration.from_secs(0),
         triangles=[TriangleListPrimitive(points=tris, color=color)],
     )
 
@@ -199,7 +208,7 @@ def make_cylinder_mesh_Z(frame_id, entity_id, radius, height, segments=64,
     )
 
 def make_cylinder_mesh_Z_at(frame_id, entity_id, radius, height, cx, cy,
-                            segments=64, color=Color(r=0, g=0, b=0, a=1.0)) -> SceneEntity:
+                            segments=48, color=Color(r=0, g=0, b=0, a=1.0)) -> SceneEntity:
     """Vertical cylinder whose axis is at (cx, cy), from z=0 to z=height."""
     top_z, bot_z = height, 0.0
     verts_top, verts_bot = [], []
@@ -228,7 +237,8 @@ def make_cylinder_mesh_Z_at(frame_id, entity_id, radius, height, cx, cy,
         tris += [bot_center, bj, bi]
     return SceneEntity(
         frame_id=frame_id, id=entity_id,
-        timestamp=now_ts(), lifetime=Duration.from_secs(0),
+        timestamp=now_ts(),
+        lifetime=Duration.from_secs(0),
         triangles=[TriangleListPrimitive(points=tris, color=color)],
     )
 
@@ -244,7 +254,6 @@ def make_cylinder_mesh_X(frame_id, entity_id, radius, length, segments=48,
         ring_R.append(Point3(x=xR, y=y, z=z))
     center_L = Point3(x=xL, y=0.0, z=0.0)
     center_R = Point3(x=xR, y=0.0, z=0.0)
-
     tris = []
     for i in range(segments):
         j = (i + 1) % segments
@@ -317,7 +326,8 @@ def make_blade_entity(frame_id: str, entity_id: str,
     ]
     return SceneEntity(
         frame_id=frame_id, id=entity_id,
-        timestamp=now_ts(), lifetime=Duration.from_secs(0),
+        timestamp=now_ts(),
+        lifetime=Duration.from_secs(0),
         triangles=[TriangleListPrimitive(points=tris, color=color)],
     )
 
@@ -328,38 +338,27 @@ def make_fov_frustum_X(frame_id: str, entity_id: str,
                        color: Color) -> SceneEntity:
     near_m = max(near_m, 1e-3)
     far_m  = max(far_m, near_m + 1e-3)
-
     h_half = math.radians(haov_deg * 0.5)
     v_half = math.radians(vaov_deg * 0.5)
-
-    # half extents in Y (horizontal) and Z (vertical)
     y_n = near_m * math.tan(h_half)
     z_n = near_m * math.tan(v_half)
     y_f =  far_m * math.tan(h_half)
     z_f =  far_m * math.tan(v_half)
-
-    # Near rectangle (x=near)
     n1 = Point3(x=near_m, y=-y_n, z=-z_n)
     n2 = Point3(x=near_m, y= y_n, z=-z_n)
     n3 = Point3(x=near_m, y= y_n, z= z_n)
     n4 = Point3(x=near_m, y=-y_n, z= z_n)
-    # Far rectangle (x=far)
-    f1 = Point3(x=far_m, y=-y_f, z=-z_f)
-    f2 = Point3(x=far_m, y= y_f, z=-z_f)
-    f3 = Point3(x=far_m, y= y_f, z= z_f)
-    f4 = Point3(x=far_m, y=-y_f, z= z_f)
-
+    f1 = Point3(x=far_m,  y=-y_f, z=-z_f)
+    f2 = Point3(x=far_m,  y= y_f, z=-z_f)
+    f3 = Point3(x=far_m,  y= y_f, z= z_f)
+    f4 = Point3(x=far_m,  y=-y_f, z= z_f)
     tris = []
-    # near face
-    tris += [n1, n2, n3]; tris += [n1, n3, n4]
-    # far face
-    tris += [f1, f3, f2]; tris += [f1, f4, f3]
-    # sides
-    tris += [n1, f2, f1]; tris += [n1, n2, f2]   # -Z
-    tris += [n2, f3, f2]; tris += [n2, n3, f3]   # +Y
-    tris += [n3, f4, f3]; tris += [n3, n4, f4]   # +Z
-    tris += [n4, f1, f4]; tris += [n4, n1, f1]   # -Y
-
+    tris += [n1,n2,n3]; tris += [n1,n3,n4]    # near
+    tris += [f1,f3,f2]; tris += [f1,f4,f3]    # far
+    tris += [n1,f2,f1]; tris += [n1,n2,f2]    # -Z
+    tris += [n2,f3,f2]; tris += [n2,n3,f3]    # +Y
+    tris += [n3,f4,f3]; tris += [n3,n4,f4]    # +Z
+    tris += [n4,f1,f4]; tris += [n4,n1,f1]    # -Y
     return SceneEntity(
         frame_id=frame_id, id=entity_id,
         timestamp=now_ts(), lifetime=Duration.from_secs(0),
@@ -452,21 +451,21 @@ def make_label_poles_entity(frame_id: str, entity_id: str,
         triangles=[TriangleListPrimitive(points=poles_tris, color=color)],
     )
 
-# ============== Scene build ==============
+# ============== Scene build (uses live knobs) ==============
 def build_scene_entities():
     WORLD, NACELLE, HUB, SCAN = "world", "nacelle", "hub", "scan_ground"
     B1, B2, B3 = "blade_1", "blade_2", "blade_3"
 
-    tower_h, tower_d = 30.0, 2.5          # << NACELLE TF uses tower_h as Z (consistency!)
+    tower_h = hub_ht_m                # tower mesh height follows hub_ht_m
+    tower_d = 2.5
     tower_radius = (tower_d / 2.0) * 0.5
     nacelle_l, nacelle_w, nacelle_h = 3.6, 1.8, 1.2
     hub_d, hub_len = 1.2, 0.8
     nose_len = 1.0
     nose_base_radius = (hub_d/2.0) * 0.6
 
-    now = now_ts()
     entities = [
-        # Tower
+        # Tower (from z=0 to z=tower_h)
         make_cylinder_mesh_Z(
             frame_id=WORLD, entity_id="tower_mesh",
             radius=tower_radius, height=tower_h, segments=64,
@@ -474,7 +473,7 @@ def build_scene_entities():
         ),
         # Nacelle
         SceneEntity(
-            frame_id=NACELLE, id="nacelle_geom", timestamp=now,
+            frame_id=NACELLE, id="nacelle_geom", timestamp=now_ts(),
             lifetime=Duration.from_secs(0),
             cubes=[CubePrimitive(
                 pose=Pose(position=Vector3(x=0.0, y=0.0, z=0.0),
@@ -491,14 +490,14 @@ def build_scene_entities():
         ),
         make_cone_mesh_X(
             frame_id=HUB, entity_id="nose_cone_mesh",
-            base_radius= nose_base_radius, length=nose_len, segments=48,
+            base_radius=nose_base_radius, length=nose_len, segments=48,
             color=Color(r=0.9, g=0.9, b=0.97, a=1.0),
         ),
-        # Blades
-        make_blade_entity("blade_1", "blade1", color=Color(r=0.95,g=0.2,b=0.2,a=1.0)),
-        make_blade_entity("blade_2", "blade2", color=Color(r=0.2,g=0.95,b=0.2,a=1.0)),
-        make_blade_entity("blade_3", "blade3", color=Color(r=0.2, g=0.2, b=0.95, a=1.0)),
-        # Ground circle at tower base
+        # Blades (length equals rotor radius = rotor_dia_m/2)
+        make_blade_entity("blade_1", "blade1",Lz=rotor_dia_m*0.5,root_w=blade_root_w_m,tip_w=blade_tip_w_m,thickness=blade_thickness_m,color=Color(r=0.95,g=0.2,b=0.2,a=1.0)),
+        make_blade_entity("blade_2", "blade2",Lz=rotor_dia_m*0.5,root_w=blade_root_w_m,tip_w=blade_tip_w_m,thickness=blade_thickness_m,color=Color(r=0.2,g=0.95,b=0.2,a=1.0)),
+        make_blade_entity("blade_3", "blade3",Lz=rotor_dia_m*0.5,root_w=blade_root_w_m,tip_w=blade_tip_w_m,thickness=blade_thickness_m,color=Color(r=0.2,g=0.2,b=0.95,a=1.0)),
+        # Ground circle at tower base (scales with rotor diameter)
         make_ground_circle_ring(
             frame_id=WORLD, entity_id="ground_circle",
             radius=1.5 * rotor_dia_m,
@@ -507,46 +506,101 @@ def build_scene_entities():
             color=circle_color,
             z_offset=0.01
         ),
+        # TRACKER ground disk and mast at y=1.125*D
+        SceneEntity(
+            frame_id=WORLD, id="tracker_marker", timestamp=now_ts(),
+            lifetime=Duration.from_secs(0),
+            triangles=[TriangleListPrimitive(
+                points=make_filled_disk_tris(0.0, rotor_dia_m*1.125, marker_outer_r_m, marker_segments),
+                color=tracker_color_blue
+            )],
+        ),
+        make_cylinder_mesh_Z_at(
+            frame_id=WORLD, entity_id="tracker_mast",
+            radius=tracker_mast_radius_m, height=tracker_ht_m,
+            cx=0.0, cy=rotor_dia_m*1.125, segments=48, color=tracker_mast_color
+        ),
+        # SPs (in SCAN so they yaw with the turbine)
+        make_bullseye_markers_with_labels(
+            frame_id=SCAN, entity_id="sp_markers_bullseye",
+            rotor_dia=rotor_dia_m, hub_ht=hub_ht_m, theta_deg=theta_deg_val,
+            inner_r=marker_inner_r_m, outer_r=marker_outer_r_m, ring_w=marker_ring_w_m,
+            segments=marker_segments, color=marker_color_red,
+            label_offset=label_offset_m, font_size=label_font_size,
+            label_color=label_color, label_bg_color=label_bg_color
+        ),
     ]
 
-    # SP markers authored in SCAN so they follow yaw
-    bullseyes = make_bullseye_markers_with_labels(
-        frame_id=SCAN, entity_id="sp_markers_bullseye",
-        rotor_dia=rotor_dia_m, hub_ht=hub_ht_m, theta_deg=theta_deg_val,
-        inner_r=marker_inner_r_m, outer_r=marker_outer_r_m, ring_w=marker_ring_w_m,
-        segments=marker_segments, color=marker_color_red,
-        label_offset=label_offset_m, font_size=label_font_size,
-        label_color=label_color, label_bg_color=label_bg_color
-    )
-    entities.append(bullseyes)
-
     if draw_label_poles:
-        pts_xy = [(-rotor_dia_m/4.0,  +rotor_dia_m*1.125),
-                  (-rotor_dia_m/4.0,  +hub_ht_m*math.tan(math.radians(theta_deg_val))),
-                  (-rotor_dia_m/4.0,  -rotor_dia_m*1.125),
-                  ( +rotor_dia_m/4.0, -hub_ht_m*math.tan(math.radians(theta_deg_val)))]
+        x = rotor_dia_m/4.0
+        yR = rotor_dia_m*1.125
+        yT = hub_ht_m*math.tan(math.radians(theta_deg_val))
+        pts_xy = [(-x, +yR), (-x, +yT), (-x, -yR), (+x, -yT)]
         entities.append(make_label_poles_entity(
-            frame_id=SCAN, entity_id="sp_label_poles",
+            frame_id="scan_ground", entity_id="sp_label_poles",
             pts_xy=pts_xy, height_m=label_height_m, radius_m=label_pole_radius_m
         ))
 
-    # TRACKER: solid blue disk at (0, R*1.125), z=0
-    px, py = 0.0, rotor_dia_m * 1.125
-    tracker_tris = make_filled_disk_tris(px, py, marker_outer_r_m, marker_segments)
-    entities.append(SceneEntity(
-        frame_id=WORLD, id="tracker_marker", timestamp=now_ts(),
-        lifetime=Duration.from_secs(0),
-        triangles=[TriangleListPrimitive(points=tracker_tris, color=tracker_color_blue)],
-    ))
-
-    # TRACKER mast: opaque black cylinder of height = tracker_ht_m, radius = 0.3
-    entities.append(make_cylinder_mesh_Z_at(
-        frame_id=WORLD, entity_id="tracker_mast",
-        radius=tracker_mast_radius_m, height=tracker_ht_m,
-        cx=0.0, cy=py, segments=48, color=tracker_mast_color
-    ))
-
     return entities, tower_h, nacelle_l, nose_len
+
+# ============== TFs / helpers ==============
+def publish_root_world(tf_ch):
+    tf_ch.log(FrameTransforms(transforms=[
+        FrameTransform(parent_frame_id="root", child_frame_id="world",
+                       translation=Vector3(x=0, y=0, z=0),
+                       rotation=Quaternion(x=0,y=0,z=0,w=1)),
+    ]))
+
+def publish_nacelle_scan_and_hub(tf_ch, yaw_rad: float, tower_h: float, nacelle_l: float):
+    # nacelle: yaw=0 faces +Y (keep +pi/2 convention)
+    nacelle_rot = yaw_rad + math.pi/2
+    sp_rot = yaw_rad + math.pi/2 + math.radians(sp_yaw_offset_deg)
+    tf_ch.log(FrameTransforms(transforms=[
+        # SPs yaw about ground with extra offset baked in
+        FrameTransform(parent_frame_id="world", child_frame_id="scan_ground",
+                       translation=Vector3(x=0, y=0, z=0),
+                       rotation=quat_from_euler(0.0, 0.0, sp_rot)),
+        # Nacelle yaw at tower top
+        FrameTransform(parent_frame_id="world", child_frame_id="nacelle",
+                       translation=Vector3(x=0, y=0, z=tower_h),
+                       rotation=quat_from_euler(0.0, 0.0, nacelle_rot)),
+        # Hub forward +X in nacelle frame
+        FrameTransform(parent_frame_id="nacelle", child_frame_id="hub",
+                       translation=Vector3(x=nacelle_l*0.6, y=0, z=0),
+                       rotation=Quaternion(x=0, y=0, z=0, w=1)),
+    ]))
+
+def current_hub_center_world(yaw_rad: float, tower_h: float, nacelle_l: float):
+    """Hub center in WORLD (matches TFs above)."""
+    nacelle_rot = yaw_rad + math.pi/2
+    hx_local, hy_local = (nacelle_l*0.6, 0.0)
+    hub_x =  hx_local*math.cos(nacelle_rot) - hy_local*math.sin(nacelle_rot)
+    hub_y =  hx_local*math.sin(nacelle_rot) + hy_local*math.cos(nacelle_rot)
+    hub_z =  tower_h
+    return hub_x, hub_y, hub_z
+
+def aim_pan_tilt_from_world_delta(dx, dy, dz):
+    # +X-forward sensor; pan about +Z, tilt about +Y; 0 pan = look -Y
+    psi   = math.atan2(dy, dx)                   # yaw from +X to target
+    theta = math.atan2(dz, math.hypot(dx,dy))    # pitch to target
+    pan   = psi + math.pi/2                      # rebase so 0 = -Y
+    tilt  = -theta                               # positive dz -> negative tilt (nose up)
+    return pan, tilt
+
+# ============== Rebuild-on-change guard ==============
+_last_geom = {"rotor": rotor_dia_m, "hub": hub_ht_m, "theta": theta_deg_val}
+
+def maybe_rebuild_scene(scene_ch):
+    global entities, tower_h, nacelle_l, nose_len, _last_geom
+    changed = (
+        rotor_dia_m   != _last_geom["rotor"] or
+        hub_ht_m      != _last_geom["hub"]   or
+        theta_deg_val != _last_geom["theta"]
+    )
+    if changed:
+        entities, tower_h, nacelle_l, nose_len = build_scene_entities()
+        scene_ch.log(SceneUpdate(entities=entities))
+        _last_geom = {"rotor": rotor_dia_m, "hub": hub_ht_m, "theta": theta_deg_val}
 
 # ============== Main loop ==============
 if __name__ == "__main__":
@@ -563,94 +617,48 @@ if __name__ == "__main__":
     WORLD, NACELLE, HUB, SCAN = "world", "nacelle", "hub", "scan_ground"
     B1, B2, B3 = "blade_1", "blade_2", "blade_3"
 
-    def publish_root_world():
-        tf_ch.log(FrameTransforms(transforms=[
-            FrameTransform(parent_frame_id="root", child_frame_id=WORLD,
-                           translation=Vector3(x=0, y=0, z=0),
-                           rotation=Quaternion(x=0,y=0,z=0,w=1)),
-        ]))
-
-    def publish_nacelle_and_scan(yaw_rad: float):
-        # nacelle: yaw=0 faces +Y (keep +pi/2 convention)
-        nacelle_rot = yaw_rad + math.pi/2
-        # SPs: same base, plus your saved +270° offset
-        sp_rot = yaw_rad + math.pi/2 + math.radians(sp_yaw_offset_deg)
-
-        tf_ch.log(FrameTransforms(transforms=[
-            # SPs yaw about ground with extra offset baked in
-            FrameTransform(parent_frame_id=WORLD, child_frame_id=SCAN,
-                           translation=Vector3(x=0, y=0, z=0),
-                           rotation=quat_from_euler(0.0, 0.0, sp_rot)),
-
-            # Nacelle yaw at tower top (use tower_h for Z!)
-            FrameTransform(parent_frame_id=WORLD, child_frame_id=NACELLE,
-                           translation=Vector3(x=0, y=0, z=tower_h),
-                           rotation=quat_from_euler(0.0, 0.0, nacelle_rot)),
-
-            # Hub forward +X in nacelle frame
-            FrameTransform(parent_frame_id=NACELLE, child_frame_id=HUB,
-                           translation=Vector3(x=nacelle_l*0.6, y=0, z=0),
-                           rotation=Quaternion(x=0, y=0, z=0, w=1)),
-        ]))
-
-    publish_root_world()
+    publish_root_world(tf_ch)
 
     while True:
         t = time.time() - t0
 
-        # Absolute yaw (deg -> rad)
+        # Live-rebuild geometry if knobs changed
+        maybe_rebuild_scene(scene_ch)
+
+        # Absolute yaw
         yaw_cmd_deg = yaw_deg + yaw_rate_deg_s * t
         yaw_cmd_rad = math.radians(yaw_cmd_deg)
-        publish_nacelle_and_scan(yaw_cmd_rad)
+        publish_nacelle_scan_and_hub(tf_ch, yaw_cmd_rad, tower_h, nacelle_l)
 
-        # Rotor phase
-        omega = rot_dir * 2.0 * math.pi * (rotor_rpm / 60.0)
-        roll = omega * t
-
-        # --- SENSOR: PAN→TILT→SENSOR chain anchored at TRACKER top ---
-        # Tracker position (WORLD). Keep your existing tracker_y and tracker_ht.
-        tracker_x = 0.0
-        tracker_y = rotor_dia_m * 1.125
-        tracker_z = tracker_ht_m  # top of mast
-
-        # Compute current hub center in WORLD (consistent with NACELLE TF!)
-        nacelle_rot = yaw_cmd_rad + math.pi/2
-        hx_local, hy_local = (nacelle_l*0.6, 0.0)
-        hub_x =  hx_local*math.cos(nacelle_rot) - hy_local*math.sin(nacelle_rot)
-        hub_y =  hx_local*math.sin(nacelle_rot) + hy_local*math.cos(nacelle_rot)
-        hub_z =  tower_h
-
-        # Aim point (hub + vertical offset)
+        # Hub center (WORLD)
+        hub_x, hub_y, hub_z = current_hub_center_world(yaw_cmd_rad, tower_h, nacelle_l)
         target_world = (hub_x, hub_y, hub_z + hub_target_z_offset_m)
 
-        # Direction from pan base (TRACKER top) to target
+        # --- SENSOR chain on tracker top ---
+        tracker_x = 0.0
+        tracker_y = rotor_dia_m * 1.125
+        tracker_z = tracker_ht_m
+
+        # Pan/tilt to aim from pan base to target
         dx = target_world[0] - tracker_x
         dy = target_world[1] - tracker_y
         dz = target_world[2] - tracker_z
+        pan_motor_rad, tilt_motor_rad = aim_pan_tilt_from_world_delta(dx, dy, dz)
 
-        # Yaw/pitch that align +X with the target
-        psi   = math.atan2(dy, dx)                         # yaw from +X
-        theta = math.atan2(dz, math.hypot(dx, dy))         # pitch about +Y
+        # Throttled human-friendly readout (~4 Hz)
+        if (t % 0.25) < dt:
+            print(f"Pan: {wrap_deg(math.degrees(pan_motor_rad)):.2f} deg, "
+                  f"Tilt: {-math.degrees(tilt_motor_rad):.2f} deg")
 
-        # --- Rebased pan: 0° = look along −Y (inline to turbine from tracker)
-        # Angle from −Y is psi + 90°.
-        pan_motor_rad  = psi + math.pi/2
-        tilt_motor_rad = -theta
-
-        # Human-friendly readout
-        print(f"Pan: {wrap_deg(math.degrees(pan_motor_rad)):.2f} deg, "
-              f"Tilt: {-math.degrees(tilt_motor_rad):.2f} deg")
-
-        # Publish PAN -> TILT -> SENSOR chain with mechanical offsets
+        # Publish PAN -> TILT -> SENSOR with offsets
         tf_ch.log(FrameTransforms(transforms=[
-            # WORLD -> PAN
-            # Base orientation yaw of -90° makes +X align with -Y when pan=0
+            # WORLD -> PAN (base yaw of -90° makes +X align with -Y when pan=0)
             FrameTransform(
                 parent_frame_id=WORLD, child_frame_id=PAN,
                 translation=Vector3(x=tracker_x, y=tracker_y, z=tracker_z),
                 rotation=quat_from_euler(0.0, 0.0, -math.pi/2 + pan_motor_rad),
             ),
-            # PAN -> TILT (apply your real offsets, then tilt about +Y)
+            # PAN -> TILT
             FrameTransform(
                 parent_frame_id=PAN, child_frame_id=TILT,
                 translation=Vector3(x=pan_to_tilt_offset[0],
@@ -658,7 +666,7 @@ if __name__ == "__main__":
                                     z=pan_to_tilt_offset[2]),
                 rotation=quat_from_euler(0.0, tilt_motor_rad, 0.0),
             ),
-            # TILT -> SENSOR (apply sensor offset, no extra rotation)
+            # TILT -> SENSOR
             FrameTransform(
                 parent_frame_id=TILT, child_frame_id=SENSOR,
                 translation=Vector3(x=tilt_to_sensor_offset[0],
@@ -668,21 +676,23 @@ if __name__ == "__main__":
             ),
         ]))
 
-        # Draw/update the translucent red FOV frustum (points along +X of SENSOR)
+        # Draw/update translucent red FOV frustum (points along +X of SENSOR)
         if sensor_enable:
             scene_ch.log(SceneUpdate(entities=[
                 make_fov_frustum_X(
                     frame_id=SENSOR,
                     entity_id="sensor_fov_body",
                     near_m=sensor_near_m,
-                    far_m=sensor_working_dist_m,
+                    far_m=sensor_far_m,
                     haov_deg=sensor_haov_deg,
                     vaov_deg=sensor_vaov_deg,
                     color=sensor_color
                 )
             ]))
 
-        # Spin blades about +X, 120° apart
+        # Rotor spin (blades rotate about +X)
+        omega = rot_dir * 2.0 * math.pi * (rotor_rpm / 60.0)
+        roll = omega * t
         tf_ch.log(FrameTransforms(transforms=[
             FrameTransform(parent_frame_id=HUB, child_frame_id=B1,
                            translation=Vector3(x=0,y=0,z=0),
@@ -695,11 +705,11 @@ if __name__ == "__main__":
                            rotation=quat_from_euler(roll + 4.0*math.pi/3.0, 0, 0)),
         ]))
 
-        # Re-send scene occasionally (helps late joins)
+        # Re-send static scene occasionally (helps late joiners)
         now_s = time.time()
         if now_s - last_scene > 1.0:
             scene_ch.log(SceneUpdate(entities=entities))
             last_scene = now_s
 
-        publish_root_world()
+        publish_root_world(tf_ch)
         time.sleep(dt)

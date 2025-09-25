@@ -45,8 +45,52 @@ Position: on top of the tracker above the laser sensor above the tilt motor
 
 
 
+*********************************************************************************************************************************************************************************************************************
+
+Table on a separate panel that contains the info:
+Rotor dia
+Hub ht
+System height
+Turbine Coorindates
+
+Rotor RPM
+Yaw
+
+Blade count global
+Blade count blade 1,2,3
+
+tracker pan tilt angle (for hub aim)
+scanner pan tilt angle (for hub aim)
 
 
+There should be a table containing the live parameters updateing properly at the top
+There should be a red indicator light that blincs when the laser hits the blade and stays on until the laser leaves it.
+The number of pulses hit by the laser should also reflect on the table. - there should be a global counter, and a blade number counter that gives the current blade that was hit, like blade 1,2,3.
+and there should be indication on the table regarding the blade colour like rgb, as r=blade 1, g=blade2, and b=blade3
+
+*********************************************************************************************************************************************************************************************************************
+
+
+
+
+
+
+the scanner current position variable should be present such that when i give scanner_current_po = sp2 or sp2 or sp3; it should move to the given position all the while, the scanner sensors should aim the hub
+from their new postion, and output the respective solved pan and tilt angles, at that pos.
+
+
+
+
+*********************************************************************************************************************************************************************************************************************
+
+
+CAMERA ZONE VIEW
+the camera with the total zone count should be visible on the horizontal portion/line, starting from the hub_ctr coordinates and rightward or leftward depending on the sp1-3 or sp4 position, according to the rotor_dia/2
+The number of zones should all be displayed at once in a very transluscent form stating from the camera upto the wtg blade position, and the current_fov should be highlighted
+
+
+
+*********************************************************************************************************************************************************************************************************************
 
 Coordinates: 
 When facing the turbine
