@@ -133,3 +133,25 @@ CSV/GeoJSON import: load WTG GPS + SP offsets from a file.
 data logging: stream status (yaw, RPM, pan/tilt, distances) to CSV for post-run analysis.
 
 screenshot hotkey: trigger Foxglove 3D panel snapshots with a button.
+
+
+
+
+
+SIMULATION CONTROL PANEL:
+auto-scan modes: sweep yaw or run SP1→SP4 sequences with dwell times.
+yaw oscillation mode: random, sine type, with yaw rate, and max limits
+Camera view
+
+
+DASHBORD:
+    N S E W direction and cartesian coordinates direction legend 
+
+    Weather data: 
+        From online, current and future based on enetered location
+            Temp
+            Humidicty
+            Precipitaiton
+            Cloud cover
+    Location data
+        Location name

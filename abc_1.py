@@ -23,6 +23,8 @@ except Exception:
 yaw_deg = 0.0
 yaw_rate_deg_s = 0.0
 rotor_rpm = 12.0
+# +1 = CCW about +X,  -1 = CW about +X
+rotor_dir = -1
 model_number = "WTG-001"
 
 # --- WTG GPS (INPUT AS N/E = LAT/LON). NO ALTITUDE INPUT ---
@@ -142,6 +144,7 @@ def get_params_snapshot():
             "yaw_deg": yaw_deg,
             "yaw_rate_deg_s": yaw_rate_deg_s,
             "rotor_rpm": rotor_rpm,
+            "rotor_dir": rotor_dir,
             "rotor_dia_m": rotor_dia_m,
             "hub_ht_m": hub_ht_m,
             "blade_thickness_m": blade_thickness_m,
@@ -154,7 +157,7 @@ def get_params_snapshot():
         }
 
 def _set_param(name: str, val):
-    global yaw_deg, yaw_rate_deg_s, rotor_rpm, rotor_dia_m, hub_ht_m
+    global yaw_deg, yaw_rate_deg_s, rotor_rpm, rotor_dir, rotor_dia_m, hub_ht_m
     global blade_thickness_m, blade_root_w_m, blade_tip_w_m
     global model_number, wtg_lat_deg, wtg_lon_deg, scanner_sp
     with _PARAM_LOCK:
@@ -164,6 +167,13 @@ def _set_param(name: str, val):
         elif name == "yaw_deg":                 yaw_deg = float(val)
         elif name == "yaw_rate_deg_s":          yaw_rate_deg_s = float(val)
         elif name == "rotor_rpm":               rotor_rpm = max(0.0, float(val))
+        elif name == "rotor_dir":
+            # Accept numbers or strings like "CW"/"CCW"
+            try:
+                rotor_dir = +1 if float(val) >= 0 else -1
+            except Exception:
+                s = str(val).strip().upper()
+                rotor_dir = -1 if s in ("CW","CLOCKWISE","-1","NEG","-") else +1
         elif name == "rotor_dia_m":             rotor_dia_m = max(1.0, float(val))
         elif name == "hub_ht_m":                hub_ht_m = max(0.5, float(val))
         elif name == "blade_thickness_m":       blade_thickness_m = max(0.01, float(val))
@@ -649,6 +659,7 @@ def compute_live_state():
         tr_tilt_d = _last_tr_tilt_deg
         sc_pan_d = _last_sc_pan_deg
         sc_tilt_d = _last_sc_tilt_deg
+        dir_sign = rotor_dir
 
     now = time.time()
     t = now - _START_TIME
@@ -676,6 +687,7 @@ def compute_live_state():
         "status": {
             "rotor_rpm": d3(rpm),
             "current_yaw_deg": d3(wrap_deg(yaw_cmd_deg)),
+            "rotor_dir": "CCW" if dir_sign >= 0 else "CW",
         },
         "coordinates_cartesian": {
             "turbine_xyz_m": (d3(hub_x), d3(hub_y), d3(hub_z)),
@@ -690,7 +702,7 @@ def compute_live_state():
             "tracker_latlon": (d3(tracker_gps[0]), d3(tracker_gps[1])),
             "SP1_latlon": (d3(sp_gps["SP1"][0]), d3(sp_gps["SP1"][1])),
             "SP2_latlon": (d3(sp_gps["SP2"][0]), d3(sp_gps["SP2"][1])),
-            "SP3_latlon": (d3(sp_gps["SP3"][0]), d3(sp_gps["SP3"][1])),  # ← fixed here
+            "SP3_latlon": (d3(sp_gps["SP3"][0]), d3(sp_gps["SP3"][1])),
             "SP4_latlon": (d3(sp_gps["SP4"][0]), d3(sp_gps["SP4"][1])),
         },
         "pt": {
@@ -737,7 +749,7 @@ _HTML = """<!doctype html>
  @media (min-width: 1200px){
    .row-top   { grid-template-columns: 360px 1fr 1fr; }
    .row-bottom{ grid-template-columns: 1fr 1fr 1fr; }
-   .row-mid   { grid-template-columns: 1fr auto; } /* schematic left, counter right */
+   .row-mid { grid-template-columns: auto auto; justify-content: start; }
  }
  .initGrid  { display:grid; grid-template-columns: minmax(120px, 1fr) minmax(120px, 1.2fr); gap: 8px 10px; align-items:center; }
  .bladeGrid { display:grid; grid-template-columns: minmax(180px, 1fr) minmax(120px, 1fr); gap: 10px 12px; align-items:center; margin-top:8px; }
@@ -746,30 +758,71 @@ _HTML = """<!doctype html>
  details.fold > summary::-webkit-details-marker { display:none; }
  .muted { color: var(--muted); font-size:11px; }
 
- /* -------- Vertical Blade Counter (scaled down ~30%, width -20%) -------- */
- .blade-card{ width:192px; border:2px solid #111; border-radius:14px; overflow:hidden; }
- .blade-head{ padding:10px 12px; font-weight:800; border-bottom:2px solid #111; letter-spacing:.4px; font-size:14px; }
- .blade-body{ padding:12px 10px; border-bottom:2px solid #111; }
- .blade-row{ display:flex; align-items:center; justify-content:space-between; margin:8px 0; }
- .dot{
-   width:41px; height:41px; border-radius:50%;
-   border:2px solid rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center;
-   font-weight:900; font-size:14px; color:#111; text-shadow:0 1px 0 rgba(255,255,255,.5);
-   transition:filter .12s ease, transform .12s ease;
- }
- .dot span{ transform:translateY(0.5px); }
- .dot-red{   background:#b71c1c; }
- .dot-green{ background:#9ad18b; }
- .dot-blue{  background:#98b9d9; }
- .dot.idle{   filter:brightness(.75); }
- .dot.active{ animation:bladeFlash .25s ease; filter:brightness(1.2); }
- @keyframes bladeFlash { from{box-shadow:0 0 0 0 rgba(0,0,0,.25);} to{box-shadow:0 0 18px 6px rgba(0,0,0,0);} }
- .countBox{ min-width:32px; padding:5px 8px; text-align:center; border:2px solid #111; border-radius:6px; font-weight:700; font-size:14px; background:#fff; }
- .blade-foot{ padding:10px 12px 12px; display:flex; flex-direction:column; align-items:center; gap:8px; }
- .foot-title{ font-weight:800; font-size:13px; }
- .count-total{ min-width:40px; font-size:16px; }
+ /* -------- Vertical Blade Counter (more vertical spacing) -------- */
+ /* -------- Blade Counter: match mock -------- */
+/* -------- Blade Counter: match mock (no side rails) -------- */
+.blade-card{
+  width:152px; border:2px solid #111; border-radius:14px; overflow:hidden; background:#fff;
+}
+.blade-head{
+  padding:13px 16px;
+  font-weight:800;
+  border-bottom:2px solid #111;
+  letter-spacing:.4px;
+  font-size:13px;   /* +20% larger “BLADE COUNTER” title */
+  text-align:left;
+}
 
- /* Schematic card */
+.blade-body{
+  padding:18px 12px;          /* roomy */
+  border-bottom:2px solid #111;
+  display:flex; flex-direction:column; gap:22px;   /* big vertical spacing */
+}
+.blade-row{
+  display:grid; grid-template-columns: 64px 1fr; align-items:center;
+}
+
+/* Colored circular badges */
+.dot{
+  width:48px; height:48px; border-radius:50%;
+  border:2px solid rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center;
+  font-weight:900; font-size:16px; color:#111;
+  transform: translateX(2px);
+}
+.dot span{ transform:translateY(0.5px); }
+.dot-red{   background:#b71c1c; }
+.dot-green{ background:#9ad18b; }
+.dot-blue{  background:#98b9d9; }
+.dot.idle{  filter:brightness(.75); }
+.dot.active{ animation:bladeFlash .25s ease; filter:brightness(1.2); }
+@keyframes bladeFlash { from{box-shadow:0 0 0 0 rgba(0,0,0,.25);} to{box-shadow:0 0 18px 6px rgba(0,0,0,0);} }
+
+/* Count box with slight overlap toward circle */
+.countBox{
+  justify-self:start;
+  margin-left:-35px;
+  min-width:44px; padding:7px 25px;
+  text-align:right; border:2px solid #111; border-radius:10px;
+  font-weight:700; font-size:16px; background:#fff;
+}
+.count-total{ min-width:18px; font-size:18px; }
+
+/* Footer row */
+.blade-foot{
+  padding:10px 12px 12px;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+}
+.foot-title{ font-weight:800; font-size:13px; letter-spacing:.4px; }
+
+
+
+ /* Schematic card (WTG INPUT PARAMETERS) slimming by 100px */
+ .wtg-card{ width: 580; }
+ @media (max-width: 1200px){
+   .wtg-card{ width: 100%; }
+ }
+
+ /* Schematic */
  .svgWrap { display:flex; justify-content:center; }
  svg.schem { width:100%; max-width:260px; height:auto; }
  svg.schem .thin { stroke:#111; stroke-width:2; fill:none; }
@@ -836,7 +889,7 @@ _HTML = """<!doctype html>
 
   <!-- ROW 3: WTG INPUT PARAMETERS (left) + BLADE COUNTER (right) -->
   <div class="row-mid" style="margin-top:16px;">
-    <div class="card">
+    <div class="card wtg-card">
       <div class="banner">WTG INPUT PARAMETERS</div>
       <div class="svgWrap">
         <svg class="schem" viewBox="0 0 540 720" aria-label="WTG schematic">
@@ -890,7 +943,7 @@ _HTML = """<!doctype html>
         </div>
       </div>
       <div class="blade-foot">
-        <div class="foot-title">TOTAL COUNT</div>
+        <div class="foot-title">TOTAL</div>
         <div id="bladeTotal" class="countBox count-total">0</div>
       </div>
     </div>
@@ -1128,7 +1181,7 @@ class ParamHTTPHandler(BaseHTTPRequestHandler):
             qs = parse_qs(p.query)
             for k, vals in qs.items():
                 v = vals[0]
-                if k in ("model_number","scanner_sp"):
+                if k in ("model_number","scanner_sp","rotor_dir"):
                     _set_param(k, v)
                 else:
                     try:
@@ -1220,6 +1273,7 @@ if __name__ == "__main__":
             dia  = rotor_dia_m
             rpm  = rotor_rpm
             which_sp = scanner_sp
+            dir_sign = rotor_dir
 
         yaw_cmd_deg = yaw0 + yr * t
         yaw_cmd_rad = math.radians(yaw_cmd_deg)
@@ -1333,7 +1387,7 @@ if __name__ == "__main__":
 
         samples = [blade_len*s for s in (0.15, 0.30, 0.45, 0.60, 0.75, 0.90)]
         omega = 2.0*math.pi*(rpm/60.0)
-        roll_base = omega * t
+        roll_base = dir_sign * omega * t  # direction control (+1 CCW, -1 CW)
 
         flags = {}
         for name, roll_off in (("B1",0.0), ("B2", 2.0*math.pi/3.0), ("B3", 4.0*math.pi/3.0)):
