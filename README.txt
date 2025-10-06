@@ -52,6 +52,11 @@ Rotor dia
 Hub ht
 System height
 Turbine Coorindates
+SP1 Location Coorindates
+SP2 Location Coorindates
+SP3 Location Coorindates
+SP4 Location Coorindates
+
 
 Rotor RPM
 Yaw
@@ -107,3 +112,24 @@ a sweep pattern is needed for the camera with sweep speed corresponding to the W
 
 
 HUD Removed.
+
+
+
+
+
+
+
+
+if you want to keep leveling it up, here are a few bite-size upgrades I can drop in next:
+
+presets: save/load full site configs (WTG, blade params, scanner SP) as JSON.
+
+auto-scan modes: sweep yaw or run SP1→SP4 sequences with dwell times.
+
+keyboard shortcuts: 1–4 to jump scanner to SP1–SP4, ←/→ tweak yaw, ↑/↓ tweak RPM.
+
+CSV/GeoJSON import: load WTG GPS + SP offsets from a file.
+
+data logging: stream status (yaw, RPM, pan/tilt, distances) to CSV for post-run analysis.
+
+screenshot hotkey: trigger Foxglove 3D panel snapshots with a button.

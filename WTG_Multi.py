@@ -87,20 +87,6 @@ livox_color         = Color(r=0.1, g=0.8, b=1.0, a=0.10)
 hub_target_z_offset_m = 0.0
 
 
-# --- Camera view helper (prints recommended panel settings) ---
-CAM_HFOV_DEG = 2.8547
-CAM_VFOV_DEG = 2.1388
-
-def _cam_aspect():
-    return math.tan(math.radians(CAM_HFOV_DEG * 0.5)) / math.tan(math.radians(CAM_VFOV_DEG * 0.5))
-
-def print_camera_panel_hint(panel_height_px=1000):
-    aspect = _cam_aspect()
-    width  = int(round(aspect * panel_height_px))
-    print(f"[Camera Panel] Set Follow Frame = sp1_camera, Vertical FOV = {CAM_VFOV_DEG}°, "
-          f"Size ≈ {width} × {panel_height_px} (aspect {aspect:.4f})")
-
-
 # Debug helpers (optional)
 DEBUG_SHOW_SENSOR_ORIGIN_CUBES = True
 DEBUG_ORIGIN_CUBE_SIZE = 0.25
@@ -551,11 +537,6 @@ if __name__ == "__main__":
 
     entities, tower_h, nacelle_l, nose_len = build_scene_entities()
     scene_ch.log(SceneUpdate(entities=entities))
-
-    # call once at startup
-    print_camera_panel_hint(1000)
-
-
 
     # Rebuild-on-change guard
     last_rotor = rotor_dia_m
