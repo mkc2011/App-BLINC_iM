@@ -18,7 +18,7 @@ except Exception:
 # ===================== CONTROL KNOBS =====================
 # --- Yaw control (absolute + optional rate) ---
 yaw_deg = 0.0
-yaw_rate_deg_s = 0.0
+yaw_rate_deg_s = 45.0
 
 # SPs start rotated +270° at yaw=0 (your saved preference)
 sp_yaw_offset_deg = 270.0
