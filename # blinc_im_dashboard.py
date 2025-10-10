@@ -168,7 +168,6 @@ def _set_param(name: str, val):
         elif name == "yaw_rate_deg_s":          yaw_rate_deg_s = float(val)
         elif name == "rotor_rpm":               rotor_rpm = max(0.0, float(val))
         elif name == "rotor_dir":
-            # Accept numbers or strings like "CW"/"CCW"
             try:
                 rotor_dir = +1 if float(val) >= 0 else -1
             except Exception:
@@ -794,12 +793,6 @@ _HTML = """<!doctype html>
  svg.yawviz .hub{ fill:#111; }
  svg.yawviz .blade{ stroke:#111; stroke-width:3; }
  svg.yawviz text{ font-weight:800; fill:#111; }
-/* --- WTG Orientation additions --- */
- svg.yawviz .nacelle { fill:#2b2b2b; }
- svg.yawviz .blade   { stroke:#111; stroke-width:3; }
- svg.yawviz .hub     { fill:#111; }
- svg.yawviz .marker  { fill:#c01919; stroke:#111; stroke-width:2; }
-
 </style>
 </head>
 <body>
@@ -857,7 +850,7 @@ _HTML = """<!doctype html>
     </div>
   </div>
 
-  <!-- ROW 3: WTG schematic + blade counter + yaw orientation -->
+  <!-- ROW 3: schematic + blade counter + yaw orientation -->
   <div class="row-mid" style="margin-top:16px;">
     <div class="card wtg-card">
       <div class="banner">WTG INPUT PARAMETERS</div>
@@ -937,26 +930,18 @@ _HTML = """<!doctype html>
       <div class="banner">WTG ORIENTATION</div>
       <div class="svgYawWrap">
         <svg class="yawviz" id="yawViz" viewBox="0 0 640 520" aria-label="Yaw orientation">
-          <!-- rounded panel -->
+          <!-- rounded rectangle -->
           <rect x="30" y="20" width="580" height="480" rx="60" ry="60" fill="none" stroke="#111" stroke-width="2"/>
-          <!-- dashed north reference -->
+          <!-- dashed vertical reference line -->
           <line x1="320" y1="40" x2="320" y2="480" class="ref" stroke-width="2"/>
-
-          <!-- main rotor circle -->
+          <!-- main circle -->
           <circle cx="320" cy="260" r="170" class="thin"/>
-
-          <!-- STATIC marker (does not rotate) -->
-          <circle cx="320" cy="430" r="8" class="marker"/>
-
-          <!-- Everything inside this group rotates with yaw -->
+          <!-- rotatable group (hub + long blade line + short theta tick) -->
           <g id="yawGroupViz" transform="rotate(0,320,260)">
-            <!-- nacelle: small top-view box, centered on hub -->
-            <rect x="311" y="232" width="18" height="28" rx="3" class="nacelle"/>
-            <!-- hub -->
             <circle cx="320" cy="260" r="8" class="hub"/>
-            <!-- rotor span (for orientation) -->
+            <!-- blade span -->
             <line x1="140" y1="260" x2="500" y2="260" class="blade"/>
-            <!-- short tick to show θ direction -->
+            <!-- short tick to visually indicate θ direction -->
             <line x1="320" y1="260" x2="320" y2="295" class="blade" stroke-width="2"/>
           </g>
           <!-- θ label (updates via JS) -->
@@ -968,9 +953,6 @@ _HTML = """<!doctype html>
   </div>
 
 <script>
-// Wrap degrees to [-180, 180)
-const wrapDeg = (a) => ((a + 180) % 360 + 360) % 360 - 180;
-
 const FIELDS = [
   ["yaw_deg", "YAW (DEG)", -180, 180, 0.1],
   ["yaw_rate_deg_s", "YAW RATE (DEG/S)", -60, 60, 0.1],
@@ -1121,15 +1103,13 @@ function renderBladeCounter(s){
   document.getElementById("bladeTotal").textContent = b.hits.total ?? 0;
 }
 
-/* Schematic labels + yaw-driven rotation (wrapped yaw) */
+/* Schematic labels + yaw-driven rotation */
 function renderSchematic(s){
   const dia  = s?.wtg_info?.rotor_dia_m ?? "";
   const hub  = s?.wtg_info?.hub_ht_m ?? "";
   const lat  = s?.wtg_lat ?? "";
   const lon  = s?.wtg_lon ?? "";
-
-  const yawRaw = Number(s?.status?.current_yaw_deg ?? 0);
-  const yaw = wrapDeg(yawRaw);
+  const yaw  = Number(s?.status?.current_yaw_deg ?? 0);
 
   const tDia = document.getElementById("txtDia");
   const tHub = document.getElementById("txtHub");
@@ -1143,14 +1123,11 @@ function renderSchematic(s){
   if (yawGroup) yawGroup.setAttribute("transform", `rotate(${yaw.toFixed(2)},270,260)`);
 }
 
-/* NEW: Yaw Orientation card renderer (wrapped, respects invert) */
+/* NEW: Yaw Orientation card renderer */
 function renderYawViz(s){
-  const yawRaw = Number(s?.status?.current_yaw_deg ?? 0);
+  const yaw  = Number(s?.status?.current_yaw_deg ?? 0);
   const invert = document.getElementById("yawInvert")?.checked;
-
-  // apply inversion first, then wrap to [-180, 180)
-  const ang = wrapDeg(invert ? -yawRaw : yawRaw);
-
+  const ang = (invert ? -yaw : yaw);
   const g = document.getElementById("yawGroupViz");
   const t = document.getElementById("yawText");
   if (g) g.setAttribute("transform", `rotate(${ang.toFixed(2)},320,260)`);
@@ -1175,9 +1152,9 @@ async function refresh(){
     bladeGrid.innerHTML = "";
     for (const [k,l,step,min] of BLADE_FIELDS) mkBladeNum(k,l,step,min, ps[k]);
 
-    // Yaw invert checkbox simple re-render hook
+    // Yaw invert checkbox re-render hook
     const inv = document.getElementById("yawInvert");
-    if (inv && !inv._bound){ inv.addEventListener("change", () => {}); inv._bound = true; }
+    if (inv && !inv._bound){ inv.addEventListener("change", () => { /* just force a visual update */ }); inv._bound = true; }
 
     const sr = await fetch("/state"); const state = await sr.json();
     renderInfo(state); renderStatus(state); renderCoords(state); renderPT(state);
