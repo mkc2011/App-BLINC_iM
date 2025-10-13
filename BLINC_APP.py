@@ -728,10 +728,57 @@ _HTML = """<!doctype html>
  }
  * { text-transform: uppercase; box-sizing: border-box; }
  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 18px; background:#f4f5f7; }
- .hero { padding: 18px 20px; margin: 0 0 16px; background:#0e1116; color:#fff; border-radius:14px; box-shadow: var(--shadow); }
- .hero h1 { margin:0; font-size: 28px; font-weight: 800; letter-spacing:.2px; }
+ .hero {
+  background: #5a5a5a;          /* dark gray bar */
+  color: #fff;
+  padding: 14px 22px;
+  border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.15);
+  margin-bottom: 16px;
+}
+
+.header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-left {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo {
+  display: block;
+  height: 40px;                 /* adjust if needed */
+  object-fit: contain;
+}
+
+.divider {
+  width: 1px;
+  height: 38px;
+  background: rgba(255,255,255,0.4);
+}
+
+.greentech {
+  height: 36px;
+}
+
+.pixxon {
+  height: 34px;
+}
+
  .card { background:var(--card-bg); padding: 12px; border:1px solid var(--border); border-radius:12px; box-shadow: var(--shadow); }
  .banner { background: var(--banner-bg); border:1px solid var(--border); padding:8px 10px; border-radius:8px; margin: -2px -2px 12px; font-size: 14px; font-weight:800; letter-spacing:.4px; }
+ .initial-card {background: #e8f5e9;border-color: #cfe9d4;}
+ .initial-card .banner {background: linear-gradient(180deg, #eaf7ee, #d9f0e0);border-color: #cfe9d4;}
  .subbanner { background:#f8fafc; border:1px dashed var(--border); padding:6px 8px; border-radius:8px; margin: 6px 0 8px; font-size: 12px; font-weight:800; letter-spacing:.3px; }
  .grid { display:grid; grid-template-columns: 200px 1fr 110px; gap: 10px 12px; align-items:center; }
  .rowlabel { font-weight: 700; font-size: 12px; color:#333; }
@@ -804,12 +851,20 @@ _HTML = """<!doctype html>
 </head>
 <body>
   <div class="hero">
-    <h1>BLINC-IM – BLADE INSPECTION IN MOTION</h1>
+    <div class="header-bar">
+      <div class="header-left">BLINC-IM</div>
+      <div class="header-right">
+        <img src="logo_GTMW.png" alt="GreenTech" class="logo greentech"/>
+        <div class="divider"></div>
+        <img src="uquc2uky.png" alt="Pixxon AI" class="logo pixxon"/>
+      </div>
+    </div>
   </div>
+
 
   <!-- ROW 1 -->
   <div class="row-top">
-    <div class="card">
+    <div class="card initial-card">
       <div class="banner">INITIAL INPUTS</div>
       <div class="initGrid" id="initialGrid"></div>
       <div class="muted" style="margin-top:8px;">ENTER WTG GPS AS N (LAT), E (LON). NO ALTITUDE.</div>
@@ -962,7 +1017,6 @@ _HTML = """<!doctype html>
           <!-- θ label (updates via JS) -->
           <text id="yawText" x="338" y="302">θ = 0.0°</text>
         </svg>
-        <label class="yaw-controls"><input type="checkbox" id="yawInvert"/> INVERT YAW (VIZ)</label>
       </div>
     </div>
   </div>
@@ -1146,16 +1200,14 @@ function renderSchematic(s){
 /* NEW: Yaw Orientation card renderer (wrapped, respects invert) */
 function renderYawViz(s){
   const yawRaw = Number(s?.status?.current_yaw_deg ?? 0);
-  const invert = document.getElementById("yawInvert")?.checked;
-
-  // apply inversion first, then wrap to [-180, 180)
-  const ang = wrapDeg(invert ? -yawRaw : yawRaw);
+  const ang = wrapDeg(yawRaw);  // <- no invert logic
 
   const g = document.getElementById("yawGroupViz");
   const t = document.getElementById("yawText");
   if (g) g.setAttribute("transform", `rotate(${ang.toFixed(2)},320,260)`);
   if (t) t.textContent = `θ = ${ang.toFixed(1)}°`;
 }
+
 
 async function refresh(){
   try{
@@ -1174,10 +1226,6 @@ async function refresh(){
     // BLADE PARAMS
     bladeGrid.innerHTML = "";
     for (const [k,l,step,min] of BLADE_FIELDS) mkBladeNum(k,l,step,min, ps[k]);
-
-    // Yaw invert checkbox simple re-render hook
-    const inv = document.getElementById("yawInvert");
-    if (inv && !inv._bound){ inv.addEventListener("change", () => {}); inv._bound = true; }
 
     const sr = await fetch("/state"); const state = await sr.json();
     renderInfo(state); renderStatus(state); renderCoords(state); renderPT(state);
