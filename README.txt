@@ -120,28 +120,30 @@ HUD Removed.
 
 
 
-if you want to keep leveling it up, here are a few bite-size upgrades I can drop in next:
 
-presets: save/load full site configs (WTG, blade params, scanner SP) as JSON.
 
-auto-scan modes: sweep yaw or run SP1→SP4 sequences with dwell times.
+- presets: save/load full site configs (WTG, blade params, scanner SP) as JSON.
 
-keyboard shortcuts: 1–4 to jump scanner to SP1–SP4, ←/→ tweak yaw, ↑/↓ tweak RPM.
+- auto-scan modes: sweep yaw or run SP1→SP4 sequences with dwell times.
 
-CSV/GeoJSON import: load WTG GPS + SP offsets from a file.
++ keyboard shortcuts: 1–4 to jump scanner to SP1–SP4, ←/→ tweak yaw, ↑/↓ tweak RPM.
 
-data logging: stream status (yaw, RPM, pan/tilt, distances) to CSV for post-run analysis.
+- CSV/GeoJSON import: load WTG GPS + SP offsets from a file.
 
-screenshot hotkey: trigger Foxglove 3D panel snapshots with a button.
+- data logging: stream status (yaw, RPM, pan/tilt, distances) to CSV for post-run analysis.
+
+- screenshot hotkey: trigger Foxglove 3D panel snapshots with a button.
 
 
 
 
 
 SIMULATION CONTROL PANEL:
-auto-scan modes: sweep yaw or run SP1→SP4 sequences with dwell times.
-yaw oscillation mode: random, sine type, with yaw rate, and max limits
-Camera view
+- auto-scan modes: sweep yaw or run SP1→SP4 sequences with dwell times.
+- yaw oscillation mode: random, sine type, with yaw rate, and max limits
+- Camera view
+- Reset Button
+- N S E W direction and cartesian coordinates direction legend 
 
 
 DASHBORD:

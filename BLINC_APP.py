@@ -1,5 +1,4 @@
-# blinc_im_dashboard.py
-import math, time, datetime, threading, json
+import math, time, datetime, threading, json, os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -12,95 +11,81 @@ from foxglove.schemas import (
     TriangleListPrimitive, Point3,
 )
 
-# Optional text labels (depends on your foxglove wheel)
 try:
     from foxglove.schemas import TextPrimitive
     HAVE_TEXT = True
 except Exception:
     HAVE_TEXT = False
 
+
+# =========================================================
+#                   CONFIG / ASSETS
+# =========================================================
+
+# ---- Inline assets for header logos ----
+_ASSETS = {}
+_ASSET_PATHS = {
+    "gt":  os.path.join(os.path.dirname(__file__), "logo_GTMW.png"),
+    "px":  os.path.join(os.path.dirname(__file__), "uquc2uky.png"),
+}
+for key, path in _ASSET_PATHS.items():
+    try:
+        with open(path, "rb") as f:
+            _ASSETS[key] = f.read()
+    except Exception as e:
+        print(f"[WARN] Could not load asset {key} from {path}: {e}")
+
 # =============== CONTROL KNOBS (defaults) ===============
 yaw_deg = 0.0
 yaw_rate_deg_s = 0.0
 rotor_rpm = 12.0
-# +1 = CCW about +X,  -1 = CW about +X
 rotor_dir = -1
 model_number = "WTG-001"
-
-# --- WTG GPS (INPUT AS N/E = LAT/LON). NO ALTITUDE INPUT ---
 wtg_lat_deg = 0.0
 wtg_lon_deg = 0.0
-
-# SCANNER POSITION SELECTOR (SP1 / SP2 / SP3 / SP4)
 scanner_sp = "SP1"
-
-# SPs start rotated +270° at yaw=0 (saved preference)
 sp_yaw_offset_deg = 270.0
-
-# --- Rotor / WTG geometry ---
-rotor_dia_m        = 80.0
-hub_ht_m           = 80.0
-theta_deg_val      = 10.0  # internal
-
-# Blade styling (under Blade Parameters)
+rotor_dia_m = 80.0
+hub_ht_m = 80.0
+theta_deg_val = 10.0
 blade_thickness_m  = 0.25
 blade_root_w_m     = 1.6
 blade_tip_w_m      = 0.40
-
-# Targeting: aim at hub center + optional vertical offset (meters)
 hub_target_z_offset_m = 20.0
-
-# Ground circle ring
 circle_ring_width_m = 0.6
 circle_segments     = 256
 circle_color        = Color(r=0.10, g=0.45, b=0.12, a=0.9)
-
-# SP bullseye styling
 marker_inner_r_m = 0.45
 marker_outer_r_m = 0.90
 marker_ring_w_m  = 0.10
 marker_segments  = 96
 marker_color_red = Color(r=1.0, g=0.0, b=0.0, a=1.0)
-
-# Labels (optional)
 label_height_m   = 2.0
 label_offset_m   = 1.0
 label_font_size  = 1.0
 label_color      = Color(r=0.0, g=0.0, b=0.0, a=1.0)
 label_bg_color   = Color(r=1.0, g=1.0, b=1.0, a=0.9)
 label_billboard  = True
-
-# TRACKER marker & mast
 tracker_color_blue     = Color(r=0.0, g=0.35, b=1.0, a=1.0)
 tracker_ht_m           = 1.0
 tracker_mast_radius_m  = 0.30
 tracker_mast_color     = Color(r=0.0, g=0.0, b=0.0, a=1.0)
-
-# --- Sensors at TRACKER top (same position/orientation) ---
-# Mechanical stack: PAN -> (offset) -> TILT -> (offset) -> SENSOR (+X forward)
-pan_to_tilt_offset    = (0.0, 0.05, 0.01)  # (x,y,z) in meters
+pan_to_tilt_offset    = (0.0, 0.05, 0.01)
 tilt_to_sensor_offset = (0.0, 0.00, 0.01)
-
-# Benewake (narrow; dynamic to hub)  — stays on TRACKER mast
 benewake_haov_deg   = 0.35
 benewake_vaov_deg   = 0.15
 benewake_near_m     = 0.20
 benewake_color      = Color(r=1.0, g=0.0, b=0.0, a=0.45)
-
-# LIVOX (as part of SCANNER; moves to SPx)
 livox_haov_deg      = 70.4
 livox_vaov_deg      = 74.2
 livox_near_m        = 0.20
 livox_far_m         = 130.0
 livox_color         = Color(r=0.0, g=0.0, b=0.1, a=0.02)
-
-# --- S-Laser + Camera (as part of SCANNER; move to SPx) ---
 slaser_haov_deg     = 0.35
 slaser_vaov_deg     = 0.15
 slaser_near_m       = 0.20
 slaser_far_m        = 150.0
 slaser_color        = Color(r=1.0, g=0.4, b=0.0, a=0.45)
-
 camera_haov_deg     = 2.8547
 camera_vaov_deg     = 2.1388
 camera_near_m       = 0.20
@@ -109,78 +94,23 @@ camera_color        = Color(r=1.0, g=1.0, b=1.0, a=0.12)
 camera_mask_alpha   = 0.80
 camera_mask_pad     = 25.0
 camera_mask_dist    = 0.12
-
-# 3D panel suggestion (printed once)
-PANEL_PRESET_DISTANCE = 14.0  # meters
-
-# Frame names
+PANEL_PRESET_DISTANCE = 14.0
 WORLD, NACELLE, HUB, SCAN = "world", "nacelle", "hub", "scan_ground"
 B1, B2, B3 = "blade_1", "blade_2", "blade_3"
-# Tracker (Benewake) sensor chain
 B_PAN, B_TILT, B_SENSOR = "benewake_pan", "benewake_tilt", "benewake_sensor"
-# Scanner chains (these move to SPx)
 L_PAN, L_TILT, L_SENSOR = "livox_pan", "livox_tilt", "livox_sensor"
 S_PAN, S_TILT, S_SENSOR = "scanner_slaser_pan", "scanner_slaser_tilt", "scanner_slaser_sensor"
-C_SENSOR = "scanner_camera_sensor"   # same pose as S_SENSOR
+C_SENSOR = "scanner_camera_sensor"
 
-# ========= param locking & timing for web panel =========
 _PARAM_LOCK = threading.Lock()
 _START_TIME = time.time()
-
-# ========= blade counter state =========
 HIT_VISUAL_GAIN = 25.0
 _blade_active = {"B1": False, "B2": False, "B3": False}
 _blade_hits = {"B1": 0, "B2": 0, "B3": 0, "total": 0}
-
-# ========= pan/tilt values for dashboard =========
 _last_tr_pan_deg = 0.0
 _last_tr_tilt_deg = 0.0
 _last_sc_pan_deg = 0.0
 _last_sc_tilt_deg = 0.0
-
-def get_params_snapshot():
-    with _PARAM_LOCK:
-        return {
-            "yaw_deg": yaw_deg,
-            "yaw_rate_deg_s": yaw_rate_deg_s,
-            "rotor_rpm": rotor_rpm,
-            "rotor_dir": rotor_dir,
-            "rotor_dia_m": rotor_dia_m,
-            "hub_ht_m": hub_ht_m,
-            "blade_thickness_m": blade_thickness_m,
-            "blade_root_w_m": blade_root_w_m,
-            "blade_tip_w_m": blade_tip_w_m,
-            "model_number": model_number,
-            "wtg_lat_deg": wtg_lat_deg,
-            "wtg_lon_deg": wtg_lon_deg,
-            "scanner_sp": scanner_sp,
-        }
-
-def _set_param(name: str, val):
-    global yaw_deg, yaw_rate_deg_s, rotor_rpm, rotor_dir, rotor_dia_m, hub_ht_m
-    global blade_thickness_m, blade_root_w_m, blade_tip_w_m
-    global model_number, wtg_lat_deg, wtg_lon_deg, scanner_sp
-    with _PARAM_LOCK:
-        if name == "model_number":              model_number = str(val)
-        elif name == "wtg_lat_deg":             wtg_lat_deg = float(val)
-        elif name == "wtg_lon_deg":             wtg_lon_deg = float(val)
-        elif name == "yaw_deg":                 yaw_deg = float(val)
-        elif name == "yaw_rate_deg_s":          yaw_rate_deg_s = float(val)
-        elif name == "rotor_rpm":               rotor_rpm = max(0.0, float(val))
-        elif name == "rotor_dir":
-            # Accept numbers or strings like "CW"/"CCW"
-            try:
-                rotor_dir = +1 if float(val) >= 0 else -1
-            except Exception:
-                s = str(val).strip().upper()
-                rotor_dir = -1 if s in ("CW","CLOCKWISE","-1","NEG","-") else +1
-        elif name == "rotor_dia_m":             rotor_dia_m = max(1.0, float(val))
-        elif name == "hub_ht_m":                hub_ht_m = max(0.5, float(val))
-        elif name == "blade_thickness_m":       blade_thickness_m = max(0.01, float(val))
-        elif name == "blade_root_w_m":          blade_root_w_m = max(0.05, float(val))
-        elif name == "blade_tip_w_m":           blade_tip_w_m = max(0.02, float(val))
-        elif name == "scanner_sp":              scanner_sp = str(val).upper() if str(val).upper() in ("SP1","SP2","SP3","SP4") else scanner_sp
-
 # ===================== UTILITIES =====================
 def wrap_deg(a: float) -> float:
     return (a + 180.0) % 360.0 - 180.0
@@ -599,6 +529,12 @@ def build_scene_entities():
                     )]),
         make_cylinder_mesh_X(HUB, "hub_mesh", radius=1.2/2.0, length=0.8, segments=48,
                              color=Color(r=0.92,g=0.92,b=0.95,a=1.0)),
+    ]
+    # fix color tuple typo
+    entities[-1] = make_cylinder_mesh_X(HUB, "hub_mesh", radius=1.2/2.0, length=0.8, segments=48,
+                             color=Color(r=0.92,g=0.92,b=0.95,a=1.0))
+
+    entities += [
         make_cone_mesh_X(HUB, "nose_cone_mesh", base_radius=(1.2/2.0)*0.6, length=1.0, segments=48,
                          color=Color(r=0.9, g=0.9, b=0.97, a=1.0)),
         make_blade_entity("blade_1","blade1",
@@ -728,57 +664,24 @@ _HTML = """<!doctype html>
  }
  * { text-transform: uppercase; box-sizing: border-box; }
  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 18px; background:#f4f5f7; }
- .hero {
-  background: #5a5a5a;          /* dark gray bar */
-  color: #fff;
-  padding: 14px 22px;
-  border-radius: 10px;
-  box-shadow: 0 4px 18px rgba(0,0,0,0.15);
-  margin-bottom: 16px;
-}
 
-.header-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.header-left {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: 0.4px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.logo {
-  display: block;
-  height: 40px;                 /* adjust if needed */
-  object-fit: contain;
-}
-
-.divider {
-  width: 1px;
-  height: 38px;
-  background: rgba(255,255,255,0.4);
-}
-
-.greentech {
-  height: 36px;
-}
-
-.pixxon {
-  height: 34px;
-}
+ /* Header bar */
+ .hero { background:#5a5a5a; color:#fff; padding:12px 20px; border-radius:10px; box-shadow: var(--shadow); margin-bottom:16px; }
+ .header-bar { display:flex; align-items:center; justify-content:space-between; }
+ .header-left { font-size:26px; font-weight:800; letter-spacing:.4px; }
+ .header-right { display:flex; align-items:center; gap:16px; }
+ .logo { height:32px; object-fit:contain; display:block; }
+ .greentech { height:30px; }
+ .pixxon { height:30px; }
+ .divider { width:1px; height:28px; background:rgba(255,255,255,.6); }
 
  .card { background:var(--card-bg); padding: 12px; border:1px solid var(--border); border-radius:12px; box-shadow: var(--shadow); }
  .banner { background: var(--banner-bg); border:1px solid var(--border); padding:8px 10px; border-radius:8px; margin: -2px -2px 12px; font-size: 14px; font-weight:800; letter-spacing:.4px; }
- .initial-card {background: #e8f5e9;border-color: #cfe9d4;}
- .initial-card .banner {background: linear-gradient(180deg, #eaf7ee, #d9f0e0);border-color: #cfe9d4;}
+
+ /* Mild green for Initial Inputs card */
+ .initial-card { background:#e8f5e9; border-color:#cfe9d4; }
+ .initial-card .banner { background: linear-gradient(180deg, #eaf7ee, #d9f0e0); border-color:#cfe9d4; }
+
  .subbanner { background:#f8fafc; border:1px dashed var(--border); padding:6px 8px; border-radius:8px; margin: 6px 0 8px; font-size: 12px; font-weight:800; letter-spacing:.3px; }
  .grid { display:grid; grid-template-columns: 200px 1fr 110px; gap: 10px 12px; align-items:center; }
  .rowlabel { font-weight: 700; font-size: 12px; color:#333; }
@@ -834,33 +737,30 @@ _HTML = """<!doctype html>
 
  /* Yaw Orientation card */
  .yaw-card .svgYawWrap{ display:flex; flex-direction:column; gap:8px; justify-content:center; align-items:center; }
- .yaw-controls{ font-size:12px; color:#333; display:flex; align-items:center; gap:8px; }
  svg.yawviz { width:100%; max-width:420px; height:auto; }
  svg.yawviz .thin{ stroke:#113A5C; stroke-width:2; fill:none; }
  svg.yawviz .ref{ stroke-dasharray:6 6; stroke:#2B6CB0; }
  svg.yawviz .hub{ fill:#111; }
  svg.yawviz .blade{ stroke:#111; stroke-width:3; }
  svg.yawviz text{ font-weight:800; fill:#111; }
-/* --- WTG Orientation additions --- */
  svg.yawviz .nacelle { fill:#2b2b2b; }
  svg.yawviz .blade   { stroke:#111; stroke-width:3; }
  svg.yawviz .hub     { fill:#111; }
  svg.yawviz .marker  { fill:#c01919; stroke:#111; stroke-width:2; }
-
 </style>
 </head>
 <body>
+  <!-- Header -->
   <div class="hero">
     <div class="header-bar">
       <div class="header-left">BLINC-IM</div>
       <div class="header-right">
-        <img src="logo_GTMW.png" alt="GreenTech" class="logo greentech"/>
+        <img src="/img/gt" alt="GreenTech" class="logo greentech"/>
         <div class="divider"></div>
-        <img src="uquc2uky.png" alt="Pixxon AI" class="logo pixxon"/>
+        <img src="/img/px" alt="Pixxon AI" class="logo pixxon"/>
       </div>
     </div>
   </div>
-
 
   <!-- ROW 1 -->
   <div class="row-top">
@@ -924,24 +824,16 @@ _HTML = """<!doctype html>
             </marker>
           </defs>
 
-          <!-- Rotor disk (static) -->
           <circle cx="270" cy="260" r="160" class="thin dash"/>
-
-          <!-- Tower (static) -->
           <rect x="267" y="260" width="6" height="300" fill="#111"/>
 
-          <!-- BEGIN: parts that rotate with YAW -->
           <g id="yawGroup" transform="rotate(0,270,260)">
-            <!-- hub -->
             <circle cx="270" cy="260" r="6" fill="#111"/>
-            <!-- three blades; this group rotates about the hub -->
             <line x1="270" y1="260" x2="270" y2="90"  class="thin"/>
             <line x1="270" y1="260" x2="125" y2="340" class="thin"/>
             <line x1="270" y1="260" x2="415" y2="340" class="thin"/>
           </g>
-          <!-- END: parts that rotate with YAW -->
 
-          <!-- Nacelle marker (optional, static) -->
           <g transform="translate(270,590)">
             <g transform="scale(0.6)">
               <path d="M0,0 c-12,0 -22,10 -22,22 c0,18 22,42 22,42 s22,-24 22,-42 c0,-12 -10,-22 -22,-22 z" fill="#111"/>
@@ -949,17 +841,14 @@ _HTML = """<!doctype html>
             </g>
           </g>
 
-          <!-- Rotor dia dimension -->
           <line x1="110" y1="120" x2="110" y2="58"  class="thin"/>
           <line x1="430" y1="120" x2="430" y2="58"  class="thin"/>
           <line x1="110" y1="58"  x2="430" y2="58"  class="thin" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
           <text id="txtDia" x="270" y="38" text-anchor="middle">ROTOR DIA: – M</text>
-          <!-- Hub ht dimension -->
           <line x1="120" y1="560" x2="58"  y2="560" class="thin"/>
           <line x1="120" y1="260" x2="58"  y2="260" class="thin"/>
           <line x1="58"  y1="560" x2="58"  y2="260" class="thin" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
           <text id="txtHub" x="28" y="410" text-anchor="middle" transform="rotate(-90,28,410)">HUB HT: – M</text>
-          <!-- Location coords centered -->
           <text id="txtLoc" x="50%" y="680" text-anchor="middle">(–, –)</text>
         </svg>
       </div>
@@ -987,34 +876,22 @@ _HTML = """<!doctype html>
       </div>
     </div>
 
-    <!-- NEW: Yaw Orientation Card -->
+    <!-- Yaw Orientation Card (no invert control) -->
     <div class="card yaw-card">
       <div class="banner">WTG ORIENTATION</div>
       <div class="svgYawWrap">
         <svg class="yawviz" id="yawViz" viewBox="0 0 640 520" aria-label="Yaw orientation">
-          <!-- rounded panel -->
           <rect x="30" y="20" width="580" height="480" rx="60" ry="60" fill="none" stroke="#111" stroke-width="2"/>
-          <!-- dashed north reference -->
           <line x1="320" y1="40" x2="320" y2="480" class="ref" stroke-width="2"/>
-
-          <!-- main rotor circle -->
           <circle cx="320" cy="260" r="170" class="thin"/>
-
-          <!-- STATIC marker (does not rotate) -->
           <circle cx="320" cy="430" r="8" class="marker"/>
 
-          <!-- Everything inside this group rotates with yaw -->
           <g id="yawGroupViz" transform="rotate(0,320,260)">
-            <!-- nacelle: small top-view box, centered on hub -->
             <rect x="311" y="232" width="18" height="28" rx="3" class="nacelle"/>
-            <!-- hub -->
             <circle cx="320" cy="260" r="8" class="hub"/>
-            <!-- rotor span (for orientation) -->
             <line x1="140" y1="260" x2="500" y2="260" class="blade"/>
-            <!-- short tick to show θ direction -->
             <line x1="320" y1="260" x2="320" y2="295" class="blade" stroke-width="2"/>
           </g>
-          <!-- θ label (updates via JS) -->
           <text id="yawText" x="338" y="302">θ = 0.0°</text>
         </svg>
       </div>
@@ -1022,85 +899,66 @@ _HTML = """<!doctype html>
   </div>
 
 <script>
-// Wrap degrees to [-180, 180)
-const wrapDeg = (a) => ((a + 180) % 360 + 360) % 360 - 180;
+const wrapDeg=(a)=>((a+180)%360+360)%360-180;
 
-const FIELDS = [
-  ["yaw_deg", "YAW (DEG)", -180, 180, 0.1],
-  ["yaw_rate_deg_s", "YAW RATE (DEG/S)", -60, 60, 0.1],
-  ["rotor_rpm", "ROTOR RPM", 0, 60, 0.1],
-];
-const SELECTS = [
-  ["scanner_sp", "SCANNER POSITION", ["SP1","SP2","SP3","SP4"]],
-];
-const INITIAL_TEXTS = [
-  ["model_number", "WTG MODEL NUMBER"],
-];
-const INITIAL_NUMS = [
-  ["rotor_dia_m",  "ROTOR DIAMETER (M)", 0.1],
-  ["hub_ht_m",     "HUB HEIGHT (M)",     0.1],
-  ["wtg_lat_deg",  "WTG GPS N (LAT, °)", 0.000001],
-  ["wtg_lon_deg",  "WTG GPS E (LON, °)", 0.000001],
-];
-const BLADE_FIELDS = [
-  ["blade_thickness_m", "BLADE THICKNESS (M)", 0.01, 0.01],
-  ["blade_root_w_m",    "BLADE ROOT WIDTH (M)", 0.01, 0.05],
-  ["blade_tip_w_m",     "BLADE TIP WIDTH (M)",  0.01, 0.02],
-];
+const FIELDS=[["yaw_deg","YAW (DEG)",-180,180,0.1],["yaw_rate_deg_s","YAW RATE (DEG/S)",-60,60,0.1],["rotor_rpm","ROTOR RPM",0,60,0.1]];
+const SELECTS=[["scanner_sp","SCANNER POSITION",["SP1","SP2","SP3","SP4"]]];
+const INITIAL_TEXTS=[["model_number","WTG MODEL NUMBER"]];
+const INITIAL_NUMS=[["rotor_dia_m","ROTOR DIAMETER (M)",0.1],["hub_ht_m","HUB HEIGHT (M)",0.1],["wtg_lat_deg","WTG GPS N (LAT, °)",0.000001],["wtg_lon_deg","WTG GPS E (LON, °)",0.000001]];
+const BLADE_FIELDS=[["blade_thickness_m","BLADE THICKNESS (M)",0.01,0.01],["blade_root_w_m","BLADE ROOT WIDTH (M)",0.01,0.05],["blade_tip_w_m","BLADE TIP WIDTH (M)",0.01,0.02]];
 
-const grid = document.getElementById("grid");
-const initialGrid = document.getElementById("initialGrid");
-const bladeGrid = document.getElementById("bladeGrid");
-const tblWTG = document.getElementById("wtg");
-const tblSTATUS = document.getElementById("status");
-const tblCRD = document.getElementById("coords");
-const tblPTScanner = document.getElementById("pt_scanner");
-const tblPTTracker = document.getElementById("pt_tracker");
+const grid=document.getElementById("grid");
+const initialGrid=document.getElementById("initialGrid");
+const bladeGrid=document.getElementById("bladeGrid");
+const tblWTG=document.getElementById("wtg");
+const tblSTATUS=document.getElementById("status");
+const tblCRD=document.getElementById("coords");
+const tblPTScanner=document.getElementById("pt_scanner");
+const tblPTTracker=document.getElementById("pt_tracker");
 
-function mkSliderRow(key, label, min, max, step, val) {
-  const lab = document.createElement("div"); lab.className = "rowlabel"; lab.textContent = label;
-  const range = document.createElement("input");
-  range.type = "range"; range.min = min; range.max = max; range.step = step; range.value = val;
-  const num = document.createElement("input"); num.type = "number"; num.className = "mono";
-  num.min = min; num.max = max; num.step = step; num.value = val;
-  range.oninput = () => { num.value = range.value; sendNum(key, range.value); };
-  num.onchange = () => { range.value = num.value; sendNum(key, num.value); };
+function mkSliderRow(key,label,min,max,step,val){
+  const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
+  const range=document.createElement("input");
+  range.type="range"; range.min=min; range.max=max; range.step=step; range.value=val;
+  const num=document.createElement("input"); num.type="number"; num.className="mono"; num.min=min; num.max=max; num.step=step; num.value=val;
+  range.oninput=()=>{ num.value=range.value; sendNum(key,range.value); };
+  num.onchange=()=>{ range.value=num.value; sendNum(key,num.value); };
   grid.appendChild(lab); grid.appendChild(range); grid.appendChild(num);
 }
-function mkSelectRow(key, label, options, val) {
-  const lab = document.createElement("div"); lab.className = "rowlabel"; lab.textContent = label;
-  const sel = document.createElement("select");
-  for (const o of options){ const op = document.createElement("option"); op.value=o; op.textContent=o; if(o===val)op.selected=true; sel.appendChild(op); }
-  sel.onchange = () => sendText(key, sel.value);
-  const spacer = document.createElement("div");
+function mkSelectRow(key,label,options,val){
+  const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
+  const sel=document.createElement("select");
+  for(const o of options){ const op=document.createElement("option"); op.value=o; op.textContent=o; if(o===val)op.selected=true; sel.appendChild(op); }
+  sel.onchange=()=>sendText(key,sel.value);
+  const spacer=document.createElement("div");
   grid.appendChild(lab); grid.appendChild(sel); grid.appendChild(spacer);
 }
-function mkInitText(key, label, val) {
-  const lab = document.createElement("div"); lab.className = "rowlabel"; lab.textContent = label;
-  const inp = document.createElement("input"); inp.type = "text"; inp.className="mono"; inp.value = val;
-  inp.onchange = () => sendText(key, inp.value);
+function mkInitText(key,label,val){
+  const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
+  const inp=document.createElement("input"); inp.type="text"; inp.className="mono"; inp.value=val;
+  inp.onchange=()=>sendText(key,inp.value);
   initialGrid.appendChild(lab); initialGrid.appendChild(inp);
 }
-function mkInitNum(key, label, step, val) {
-  const lab = document.createElement("div"); lab.className = "rowlabel"; lab.textContent = label;
-  const inp = document.createElement("input"); inp.type = "number"; inp.className="mono"; inp.step = step; inp.value = val;
-  inp.onchange = () => sendNum(key, inp.value);
+function mkInitNum(key,label,step,val){
+  const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
+  const inp=document.createElement("input"); inp.type="number"; inp.className="mono"; inp.step=step; inp.value=val;
+  inp.onchange=()=>sendNum(key,inp.value);
   initialGrid.appendChild(lab); initialGrid.appendChild(inp);
 }
-function mkBladeNum(key, label, step, min, val) {
-  const lab = document.createElement("div"); lab.className = "rowlabel"; lab.textContent = label;
-  const inp = document.createElement("input"); inp.type = "number"; inp.className="mono";
+function mkBladeNum(key,label,step,min,val){
+  const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
+  const inp=document.createElement("input"); inp.type="number"; inp.className="mono";
   if(step!=null)inp.step=step; if(min!=null)inp.min=min; inp.value=val;
-  inp.onchange = () => sendNum(key, inp.value);
+  inp.onchange=()=>sendNum(key,inp.value);
   bladeGrid.appendChild(lab); bladeGrid.appendChild(inp);
 }
 
-async function sendNum(key, value){ try{ await fetch(`/set?${encodeURIComponent(key)}=${encodeURIComponent(value)}`);}catch(e){} }
-async function sendText(key, value){ try{ await fetch(`/set?${encodeURIComponent(key)}=${encodeURIComponent(value)}`);}catch(e){} }
+async function sendNum(key,value){ try{ await fetch(`/set?${encodeURIComponent(key)}=${encodeURIComponent(value)}`);}catch(e){} }
+async function sendText(key,value){ try{ await fetch(`/set?${encodeURIComponent(key)}=${encodeURIComponent(value)}`);}catch(e){} }
 
 function renderInfo(s){
-  const w = s.wtg_info;
-  tblWTG.innerHTML = `
+  const w=s.wtg_info;
+  tblWTG.innerHTML=`
     <tr><th class="section">FIELD</th><th class="section">VALUE</th></tr>
     <tr><td>MODEL NUMBER</td><td class="mono">${w.model_number}</td></tr>
     <tr><td>ROTOR DIA (M)</td><td class="mono">${w.rotor_dia_m}</td></tr>
@@ -1108,18 +966,18 @@ function renderInfo(s){
     <tr><td>SYSTEM HEIGHT (TIP, M)</td><td class="mono">${w.system_height_m}</td></tr>`;
 }
 function renderStatus(s){
-  const d = s.status;
-  tblSTATUS.innerHTML = `
+  const d=s.status;
+  tblSTATUS.innerHTML=`
     <tr><th class="section">METRIC</th><th class="section">VALUE</th></tr>
     <tr><td>ROTOR RPM</td><td class="mono">${d.rotor_rpm}</td></tr>
     <tr><td>CURRENT YAW (DEG)</td><td class="mono">${d.current_yaw_deg}</td></tr>`;
 }
 function renderCoords(s){
-  const c = s.coordinates_cartesian, g = s.coordinates_gps;
+  const c=s.coordinates_cartesian, g=s.coordinates_gps;
   function vec3(v){ return `(${v[0]}, ${v[1]}, ${v[2]})`; }
   function latlon(v){ return `(${v[0]}, ${v[1]})`; }
   function row(name, cart, gps){ return `<tr><td>${name}</td><td class="mono">${cart}</td><td class="mono">${gps}</td></tr>`; }
-  tblCRD.innerHTML = `
+  tblCRD.innerHTML=`
     <tr><th class="section"></th><th class="section">CARTESIAN XYZ (M)</th><th class="section">GPS (LAT, LON)</th></tr>
     ${row("TURBINE (HUB)", vec3(c.turbine_xyz_m), latlon(g.turbine_latlon))}
     ${row("TRACKER", vec3(c.tracker_xyz_m), latlon(g.tracker_latlon))}
@@ -1132,110 +990,86 @@ function renderCoords(s){
       <input id="wtgLon" type="number" step="0.000001" min="-180" max="180" style="width:180px"/>
     </td></tr>`;
 
-  const lat = document.getElementById("wtgLat");
-  const lon = document.getElementById("wtgLon");
-  lat.value = s.wtg_lat;
-  lon.value = s.wtg_lon;
-  lat.onchange = () => sendNum("wtg_lat_deg", lat.value);
-  lon.onchange = () => sendNum("wtg_lon_deg", lon.value);
+  const lat=document.getElementById("wtgLat");
+  const lon=document.getElementById("wtgLon");
+  lat.value=s.wtg_lat;
+  lon.value=s.wtg_lon;
+  lat.onchange=()=>sendNum("wtg_lat_deg",lat.value);
+  lon.onchange=()=>sendNum("wtg_lon_deg",lon.value);
 }
 
-/* PT MOTOR DATA */
 function renderPT(s){
-  const sc = (s.pt && s.pt.scanner) || {};
-  const tr = (s.pt && s.pt.tracker) || {};
-  const which = s.scanner_sp || "";
-  tblPTScanner.innerHTML = `
+  const sc=(s.pt&&s.pt.scanner)||{};
+  const tr=(s.pt&&s.pt.tracker)||{};
+  const which=s.scanner_sp||"";
+  tblPTScanner.innerHTML=`
     <tr><th class="section">METRIC</th><th class="section">VALUE</th></tr>
     <tr><td>SCANNER POSITION</td><td class="mono">${which}</td></tr>
-    <tr><td>PAN (DEG)</td><td class="mono">${sc.pan_deg ?? ""}</td></tr>
-    <tr><td>TILT (DEG)</td><td class="mono">${sc.tilt_deg ?? ""}</td></tr>`;
-  tblPTTracker.innerHTML = `
+    <tr><td>PAN (DEG)</td><td class="mono">${sc.pan_deg??""}</td></tr>
+    <tr><td>TILT (DEG)</td><td class="mono">${sc.tilt_deg??""}</td></tr>`;
+  tblPTTracker.innerHTML=`
     <tr><th class="section">METRIC</th><th class="section">VALUE</th></tr>
-    <tr><td>PAN (DEG)</td><td class="mono">${tr.pan_deg ?? ""}</td></tr>
-    <tr><td>TILT (DEG)</td><td class="mono">${tr.tilt_deg ?? ""}</td></tr>`;
+    <tr><td>PAN (DEG)</td><td class="mono">${tr.pan_deg??""}</td></tr>
+    <tr><td>TILT (DEG)</td><td class="mono">${tr.tilt_deg??""}</td></tr>`;
 }
 
-/* Blade counter renderer */
 function renderBladeCounter(s){
-  const b = s.blade || {active:{}, hits:{}};
-  const setDot = (id, on) => {
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.classList.remove("active","idle");
-    el.classList.add(on ? "active" : "idle");
-  };
-  setDot("b1Dot", !!b.active.B1);
-  setDot("b2Dot", !!b.active.B2);
-  setDot("b3Dot", !!b.active.B3);
-
-  document.getElementById("b1Count").textContent = b.hits.B1 ?? 0;
-  document.getElementById("b2Count").textContent = b.hits.B2 ?? 0;
-  document.getElementById("b3Count").textContent = b.hits.B3 ?? 0;
-  document.getElementById("bladeTotal").textContent = b.hits.total ?? 0;
+  const b=s.blade||{active:{},hits:{}};
+  const setDot=(id,on)=>{ const el=document.getElementById(id); if(!el)return; el.classList.remove("active","idle"); el.classList.add(on?"active":"idle"); };
+  setDot("b1Dot",!!b.active.B1); setDot("b2Dot",!!b.active.B2); setDot("b3Dot",!!b.active.B3);
+  document.getElementById("b1Count").textContent=b.hits.B1??0;
+  document.getElementById("b2Count").textContent=b.hits.B2??0;
+  document.getElementById("b3Count").textContent=b.hits.B3??0;
+  document.getElementById("bladeTotal").textContent=b.hits.total??0;
 }
 
-/* Schematic labels + yaw-driven rotation (wrapped yaw) */
 function renderSchematic(s){
-  const dia  = s?.wtg_info?.rotor_dia_m ?? "";
-  const hub  = s?.wtg_info?.hub_ht_m ?? "";
-  const lat  = s?.wtg_lat ?? "";
-  const lon  = s?.wtg_lon ?? "";
-
-  const yawRaw = Number(s?.status?.current_yaw_deg ?? 0);
-  const yaw = wrapDeg(yawRaw);
-
-  const tDia = document.getElementById("txtDia");
-  const tHub = document.getElementById("txtHub");
-  const tLoc = document.getElementById("txtLoc");
-  const yawGroup = document.getElementById("yawGroup");
-
-  if (tDia) tDia.textContent = `ROTOR DIA: ${dia} M`;
-  if (tHub) tHub.textContent = `HUB HT: ${hub} M`;
-  if (tLoc) tLoc.textContent = `(${lat}, ${lon})`;
-
-  if (yawGroup) yawGroup.setAttribute("transform", `rotate(${yaw.toFixed(2)},270,260)`);
+  const dia=s?.wtg_info?.rotor_dia_m??""; const hub=s?.wtg_info?.hub_ht_m??"";
+  const lat=s?.wtg_lat??""; const lon=s?.wtg_lon??"";
+  const yawRaw=Number(s?.status?.current_yaw_deg??0); const yaw=wrapDeg(yawRaw);
+  const tDia=document.getElementById("txtDia"); const tHub=document.getElementById("txtHub"); const tLoc=document.getElementById("txtLoc"); const yawGroup=document.getElementById("yawGroup");
+  if(tDia) tDia.textContent=`ROTOR DIA: ${dia} M`;
+  if(tHub) tHub.textContent=`HUB HT: ${hub} M`;
+  if(tLoc) tLoc.textContent=`(${lat}, ${lon})`;
+  if(yawGroup) yawGroup.setAttribute("transform",`rotate(${yaw.toFixed(2)},270,260)`);
 }
 
-/* NEW: Yaw Orientation card renderer (wrapped, respects invert) */
+/* Yaw viz (no invert support) */
 function renderYawViz(s){
-  const yawRaw = Number(s?.status?.current_yaw_deg ?? 0);
-  const ang = wrapDeg(yawRaw);  // <- no invert logic
-
-  const g = document.getElementById("yawGroupViz");
-  const t = document.getElementById("yawText");
-  if (g) g.setAttribute("transform", `rotate(${ang.toFixed(2)},320,260)`);
-  if (t) t.textContent = `θ = ${ang.toFixed(1)}°`;
+  const yawRaw=Number(s?.status?.current_yaw_deg??0);
+  const ang=wrapDeg(yawRaw);
+  const g=document.getElementById("yawGroupViz");
+  const t=document.getElementById("yawText");
+  if(g) g.setAttribute("transform",`rotate(${ang.toFixed(2)},320,260)`);
+  if(t) t.textContent=`θ = ${ang.toFixed(1)}°`;
 }
-
 
 async function refresh(){
   try{
-    const pr = await fetch("/get"); const ps = await pr.json();
-
+    const pr=await fetch("/get"); const ps=await pr.json();
     // INITIAL INPUTS
-    initialGrid.innerHTML = "";
-    for (const [k,l] of INITIAL_TEXTS) mkInitText(k,l, ps[k] ?? "");
-    for (const [k,l,step] of INITIAL_NUMS) mkInitNum(k,l,step, ps[k]);
+    initialGrid.innerHTML="";
+    for(const [k,l] of INITIAL_TEXTS) mkInitText(k,l, ps[k]??"");
+    for(const [k,l,step] of INITIAL_NUMS) mkInitNum(k,l,step, ps[k]);
 
     // LIVE CONTROLS
-    grid.innerHTML = "";
-    for (const [k,l,mi,ma,st] of FIELDS) mkSliderRow(k,l,mi,ma,st, ps[k]);
-    for (const [k,l,opts] of SELECTS) mkSelectRow(k,l,opts, ps[k]);
+    grid.innerHTML="";
+    for(const [k,l,mi,ma,st] of FIELDS) mkSliderRow(k,l,mi,ma,st, ps[k]);
+    for(const [k,l,opts] of SELECTS) mkSelectRow(k,l,opts, ps[k]);
 
     // BLADE PARAMS
-    bladeGrid.innerHTML = "";
-    for (const [k,l,step,min] of BLADE_FIELDS) mkBladeNum(k,l,step,min, ps[k]);
+    bladeGrid.innerHTML="";
+    for(const [k,l,step,min] of BLADE_FIELDS) mkBladeNum(k,l,step,min, ps[k]);
 
-    const sr = await fetch("/state"); const state = await sr.json();
+    const sr=await fetch("/state"); const state=await sr.json();
     renderInfo(state); renderStatus(state); renderCoords(state); renderPT(state);
     renderBladeCounter(state); renderSchematic(state); renderYawViz(state);
   }catch(e){ console.error(e); }
 }
 
-setInterval(async () => {
+setInterval(async ()=>{
   try{
-    const sr = await fetch("/state"); const state = await sr.json();
+    const sr=await fetch("/state"); const state=await sr.json();
     renderInfo(state); renderStatus(state); renderCoords(state); renderPT(state);
     renderBladeCounter(state); renderSchematic(state); renderYawViz(state);
   }catch(e){}
@@ -1245,7 +1079,51 @@ refresh();
 </script>
 </body>
 </html>"""
+# ===================== PARAM SNAPSHOT / SETTER =====================
+def get_params_snapshot():
+    with _PARAM_LOCK:
+        return {
+            "yaw_deg": yaw_deg,
+            "yaw_rate_deg_s": yaw_rate_deg_s,
+            "rotor_rpm": rotor_rpm,
+            "rotor_dir": rotor_dir,
+            "rotor_dia_m": rotor_dia_m,
+            "hub_ht_m": hub_ht_m,
+            "blade_thickness_m": blade_thickness_m,
+            "blade_root_w_m": blade_root_w_m,
+            "blade_tip_w_m": blade_tip_w_m,
+            "model_number": model_number,
+            "wtg_lat_deg": wtg_lat_deg,
+            "wtg_lon_deg": wtg_lon_deg,
+            "scanner_sp": scanner_sp,
+        }
 
+def _set_param(name: str, val):
+    global yaw_deg, yaw_rate_deg_s, rotor_rpm, rotor_dir, rotor_dia_m, hub_ht_m
+    global blade_thickness_m, blade_root_w_m, blade_tip_w_m
+    global model_number, wtg_lat_deg, wtg_lon_deg, scanner_sp
+    with _PARAM_LOCK:
+        if name == "model_number":              model_number = str(val)
+        elif name == "wtg_lat_deg":             wtg_lat_deg = float(val)
+        elif name == "wtg_lon_deg":             wtg_lon_deg = float(val)
+        elif name == "yaw_deg":                 yaw_deg = float(val)
+        elif name == "yaw_rate_deg_s":          yaw_rate_deg_s = float(val)
+        elif name == "rotor_rpm":               rotor_rpm = max(0.0, float(val))
+        elif name == "rotor_dir":
+            try:
+                rotor_dir = +1 if float(val) >= 0 else -1
+            except Exception:
+                s = str(val).strip().upper()
+                rotor_dir = -1 if s in ("CW","CLOCKWISE","-1","NEG","-") else +1
+        elif name == "rotor_dia_m":             rotor_dia_m = max(1.0, float(val))
+        elif name == "hub_ht_m":                hub_ht_m = max(0.5, float(val))
+        elif name == "blade_thickness_m":       blade_thickness_m = max(0.01, float(val))
+        elif name == "blade_root_w_m":          blade_root_w_m = max(0.05, float(val))
+        elif name == "blade_tip_w_m":           blade_tip_w_m = max(0.02, float(val))
+        elif name == "scanner_sp":              scanner_sp = str(val).upper() if str(val).upper() in ("SP1","SP2","SP3","SP4") else scanner_sp
+
+
+# ===================== HTTP HANDLER =====================
 class ParamHTTPHandler(BaseHTTPRequestHandler):
     def _send_text(self, code, text, ctype="application/json; charset=utf-8"):
         self.send_response(code)
@@ -1258,6 +1136,13 @@ class ParamHTTPHandler(BaseHTTPRequestHandler):
             text = text.encode("utf-8")
         self.wfile.write(text)
 
+    def _send_bin(self, code, data, ctype="application/octet-stream"):
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(data if data is not None else b"")
+
     def do_GET(self):
         p = urlparse(self.path)
         if p.path == "/":
@@ -1267,6 +1152,14 @@ class ParamHTTPHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(_HTML.encode("utf-8"))
             return
+
+        # Header logos (served locally)
+        if p.path == "/img/gt":
+            data = _ASSETS.get("gt")
+            return self._send_bin(200, data, "image/png") if data else self._send_text(404, {"error":"GT logo missing"})
+        if p.path == "/img/px":
+            data = _ASSETS.get("px")
+            return self._send_bin(200, data, "image/png") if data else self._send_text(404, {"error":"PIXXON logo missing"})
 
         if p.path == "/get":
             return self._send_text(200, get_params_snapshot())
@@ -1289,10 +1182,12 @@ class ParamHTTPHandler(BaseHTTPRequestHandler):
 
         return self._send_text(404, {"error":"NOT FOUND"})
 
+
 def start_param_server(host="127.0.0.1", port=8888):
     httpd = HTTPServer((host, port), ParamHTTPHandler)
     print(f"[DASHBOARD] OPEN http://{host}:{port}")
     httpd.serve_forever()
+
 
 # ---------- blade/frustum intersection helpers ----------
 def _blade_point_world(z_along_m, roll_k, nacelle_rot, hub_xyz):
@@ -1323,17 +1218,20 @@ def _update_blade_counters(active_now):
                 _blade_hits["total"] += 1
             _blade_active[k] = active_now[k]
 
+
 # ===================== MAIN =====================
 if __name__ == "__main__":
+    # Start param server (serves HTML + JSON + logos)
     threading.Thread(target=start_param_server, args=("127.0.0.1", 8888), daemon=True).start()
 
+    # Start Foxglove
     foxglove.start_server(host="127.0.0.1", port=8765)
     scene_ch = SceneUpdateChannel(topic="/scene")
     tf_ch = FrameTransformsChannel(topic="/tf")
 
+    # Initial scene
     entities, tower_h, nacelle_l, nose_len = build_scene_entities()
     scene_ch.log(SceneUpdate(entities=entities))
-
     print_sp1_panel_preset()
 
     # Live rebuild-on-change guard
