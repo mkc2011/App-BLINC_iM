@@ -490,13 +490,21 @@ def publish_world_root(tf_ch):
                        rotation=Quaternion(x=0,y=0,z=0,w=1)),
     ]))
 
-def publish_wtg_frames(tf_ch, yaw_rad: float, tower_h: float, nacelle_l: float):
-    nacelle_rot = yaw_rad + math.pi/2
-    sp_rot = yaw_rad + math.pi/2 + math.radians(sp_yaw_offset_deg)
+# --- OLD (replaced): publish_wtg_frames removed in favor of split publishers ---
+
+# NEW: SCAN frame uses steady yaw (no oscillation)
+def publish_scan_frame(tf_ch, sp_yaw_rad: float):
+    sp_rot = sp_yaw_rad + math.pi/2 + math.radians(sp_yaw_offset_deg)
     tf_ch.log(FrameTransforms(transforms=[
         FrameTransform(parent_frame_id=WORLD, child_frame_id=SCAN,
                        translation=Vector3(x=0, y=0, z=0),
                        rotation=quat_from_euler(0.0, 0.0, sp_rot)),
+    ]))
+
+# NEW: Nacelle/Hub use oscillating yaw
+def publish_nacelle_frames(tf_ch, yaw_rad: float, tower_h: float, nacelle_l: float):
+    nacelle_rot = yaw_rad + math.pi/2
+    tf_ch.log(FrameTransforms(transforms=[
         FrameTransform(parent_frame_id=WORLD, child_frame_id=NACELLE,
                        translation=Vector3(x=0, y=0, z=tower_h),
                        rotation=quat_from_euler(0.0, 0.0, nacelle_rot)),
@@ -649,8 +657,15 @@ def compute_live_state():
 
     now = time.time()
     t = now - _START_TIME
+
+    # Oscillating yaw (drives nacelle/hub)
     yaw_cmd_deg = yaw_deg + yaw_rate_deg_s * t + _osc_angle_deg
     yaw_cmd_rad = math.radians(yaw_cmd_deg)
+
+    # Steady yaw for SCAN/SP (no oscillation)
+    sp_yaw_deg = yaw_deg + yaw_rate_deg_s * t
+    sp_yaw_rad = math.radians(sp_yaw_deg)
+
     hub_x, hub_y, hub_z = hub_center_world(yaw_cmd_rad, 3.6)
 
     tracker_base = (0.0, dia*1.125, tracker_ht_m)
@@ -660,7 +675,7 @@ def compute_live_state():
 
     turbine_gps = enu_to_wgs84(hub_x, hub_y, hub_z, wtg_lat, wtg_lon, 0.0)[:2]
     tracker_gps = enu_to_wgs84(*tracker_base, wtg_lat, wtg_lon, 0.0)[:2]
-    sp_world = sp_xy_world_all(yaw_cmd_rad)
+    sp_world = sp_xy_world_all(sp_yaw_rad)  # decoupled from oscillation
     sp_gps = {k: enu_to_wgs84(v[0], v[1], 0.0, wtg_lat, wtg_lon, 0.0)[:2] for k, v in sp_world.items()}
 
     return {
@@ -1450,12 +1465,17 @@ if __name__ == "__main__":
                 decay = sign * min(abs(_osc_angle_deg), rate * dt if rate > 0 else abs(_osc_angle_deg))
                 _osc_angle_deg += decay
 
-        # Turbine yaw (absolute + rate + oscillation)
-        yaw_cmd_deg = yaw0 + yr * t + _osc_angle_deg
+        # ======= DECISION: use two yaw angles =======
+        yaw_cmd_deg = yaw0 + yr * t + _osc_angle_deg  # oscillating (nacelle/hub/blades)
         yaw_cmd_rad = math.radians(yaw_cmd_deg)
-        publish_wtg_frames(tf_ch, yaw_cmd_rad, hub_ht_m, 3.6)
+        sp_yaw_deg  = yaw0 + yr * t                   # steady (SCAN/SP)
+        sp_yaw_rad  = math.radians(sp_yaw_deg)
 
-        # Hub target (with vertical offset) in WORLD coordinates
+        # Publish frames separately
+        publish_scan_frame(tf_ch, sp_yaw_rad)
+        publish_nacelle_frames(tf_ch, yaw_cmd_rad, hub_ht_m, 3.6)
+
+        # Hub target (with vertical offset) in WORLD coordinates (oscillating yaw)
         hub_x, hub_y, hub_z = hub_center_world(yaw_cmd_rad, 3.6)
         hub_xyz = (hub_x, hub_y, hub_z)
         target_world = (hub_x, hub_y, hub_z + hub_target_z_offset_m)
@@ -1498,7 +1518,7 @@ if __name__ == "__main__":
         ]))
 
         # ---------------- SCANNER (LIVOX + S-LASER + CAMERA) ----------------
-        sp_world = sp_xy_world_all(yaw_cmd_rad)
+        sp_world = sp_xy_world_all(sp_yaw_rad)  # decoupled from oscillation
         sbx, sby, sbz = (*sp_world[which_sp][:2], tracker_ht_m)
         scanner_base_world = (sbx, sby, sbz)
 

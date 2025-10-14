@@ -108,7 +108,7 @@ Z height
 
 
 
-a sweep pattern is needed for the camera with sweep speed corresponding to the WTG rotational speed at a particular spot
+a sweep pattern is needed for the camera with sweep speed corresponding to the WTG rotational speed (downward linear) at a particular spot
 
 
 HUD Removed.
@@ -140,20 +140,42 @@ HUD Removed.
 
 SIMULATION CONTROL PANEL:
 - auto-scan modes: sweep yaw or run SP1→SP4 sequences with dwell times.
-- yaw oscillation mode: random, sine type, with yaw rate, and max limits
++ yaw oscillation mode: random, sine type, with yaw rate, and max limits
 - Camera view
 - Reset Button
 - N S E W direction and cartesian coordinates direction legend 
+- Top heading banner resizing
 
 
 DASHBORD:
     N S E W direction and cartesian coordinates direction legend 
 
-    Weather data: 
-        From online, current and future based on enetered location
-            Temp
-            Humidicty
-            Precipitaiton
-            Cloud cover
-    Location data
-        Location name
+
+    
+    
+    
+    Based on GPS location and time, from the internet:
+
+    Display: 
+
+        Site/Location name
+
+        Weather data: 
+            From online, current and future based on enetered location
+                Temp
+                Humidicty
+                Precipitaiton now and for next 3 hours
+                Cloud cover
+
+
+
+System status 
+    System Temperature
+    Battery status - in the form icon
+    
+Warnings (with icon)
+    Yaw out of limit
+    Rotor speed out of limit - either high or low below a threshold value that can be set (eg. 12 rpm - upper limit and 1 rpm - for lower limit)
+    Low ambient light
+    Sensor blocked 
+    System warnings - like motor, camera, processor, comm, etc.,
