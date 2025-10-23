@@ -147,6 +147,8 @@ SIMULATION CONTROL PANEL:
 - Top heading banner resizing
 
 
+- show time 
+
 DASHBORD:
     N S E W direction and cartesian coordinates direction legend 
 
