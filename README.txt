@@ -175,7 +175,7 @@ System stats
 
 Self levelling info (for both scanner and tracker)
 
-Scanner position visual map indication (scanner)
++ Scanner position visual map indication (scanner)
     
 Warnings (with icon)
     Yaw out of limit
@@ -186,7 +186,7 @@ Warnings (with icon)
 
 
 Subdivide the scanner and tracker and simulation controls
-    Data input horizontal card
+    + Data input horizontal card
     Scanner  dashboard visual/stats
         Top banner with battery status, network connectivity
         Warning Banner (with warning icon/errors/alarms)
@@ -196,3 +196,4 @@ Subdivide the scanner and tracker and simulation controls
     Simulation controls
 
 Include Power button
+Levelling system
