@@ -147,6 +147,8 @@ SIMULATION CONTROL PANEL:
 - Top heading banner resizing
 
 
+- show time 
+
 DASHBORD:
     N S E W direction and cartesian coordinates direction legend 
 
@@ -169,9 +171,13 @@ DASHBORD:
 
 
 
-System status 
+System stats 
     System Temperature
     Battery status - in the form icon
+
+Self levelling info (for both scanner and tracker)
+
++ Scanner position visual map indication (scanner)
     
 Warnings (with icon)
     Yaw out of limit
@@ -179,3 +185,17 @@ Warnings (with icon)
     Low ambient light
     Sensor blocked 
     System warnings - like motor, camera, processor, comm, etc.,
+
+
+Subdivide the scanner and tracker and simulation controls
+    + Data input horizontal card
+    Scanner  dashboard visual/stats
+        Top banner with battery status, network connectivity
+        Warning Banner (with warning icon/errors/alarms)
+        Power button
+        Visuals
+    Tracker dashboard visual/stats
+    Simulation controls
+
+Include Power button
+Levelling system
