@@ -1341,6 +1341,30 @@ tabButtons.forEach(btn=>{
   });
 });
 
+const INPUT_DEBOUNCE_MS = 180;
+const inputDebouncers = new Map();
+function debounceSend(key, value, mode){
+  if(inputDebouncers.has(key)){
+    clearTimeout(inputDebouncers.get(key));
+  }
+  const timer=setTimeout(()=>{
+    inputDebouncers.delete(key);
+    if(mode==="text"){ sendText(key, value); }
+    else{ sendNum(key, value); }
+  }, INPUT_DEBOUNCE_MS);
+  inputDebouncers.set(key, timer);
+}
+function queueNumIfValid(key, inputEl){
+  if(!inputEl) return;
+  const value=inputEl.value;
+  if(value==="" || !inputEl.checkValidity()) return;
+  debounceSend(key, value, "number");
+}
+function queueText(key, inputEl){
+  if(!inputEl) return;
+  debounceSend(key, inputEl.value, "text");
+}
+
 function mkSliderRow(key,label,min,max,step,val){
   if(!liveControlsGrid) return;
   const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
@@ -1348,7 +1372,9 @@ function mkSliderRow(key,label,min,max,step,val){
   range.type="range"; range.min=min; range.max=max; range.step=step; range.value=val;
   const num=document.createElement("input"); num.type="number"; num.className="mono"; num.min=min; num.max=max; num.step=step; num.value=val;
   range.oninput=()=>{ num.value=range.value; sendNum(key,range.value); };
-  num.onchange=()=>{ range.value=num.value; sendNum(key,num.value); };
+  num.oninput=()=>{ range.value=num.value; queueNumIfValid(key,num); };
+  num.onchange=()=>{ range.value=num.value; queueNumIfValid(key,num); };
+  num.onblur=()=>queueNumIfValid(key,num);
   liveControlsGrid.appendChild(lab); liveControlsGrid.appendChild(range); liveControlsGrid.appendChild(num);
 }
 function mkSelectRow(key,label,options,val){
@@ -1365,7 +1391,9 @@ function mkInitText(key,label,val){
     if(!container) continue;
     const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
     const inp=document.createElement("input"); inp.type="text"; inp.className="mono"; inp.value=val;
-    inp.onchange=()=>sendText(key,inp.value);
+    inp.oninput=()=>queueText(key,inp);
+    inp.onchange=()=>queueText(key,inp);
+    inp.onblur=()=>queueText(key,inp);
     container.appendChild(lab); container.appendChild(inp);
   }
 }
@@ -1374,7 +1402,9 @@ function mkInitNum(key,label,step,val){
     if(!container) continue;
     const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
     const inp=document.createElement("input"); inp.type="number"; inp.className="mono"; inp.step=step; inp.value=val;
-    inp.onchange=()=>sendNum(key,inp.value);
+    inp.oninput=()=>queueNumIfValid(key,inp);
+    inp.onchange=()=>queueNumIfValid(key,inp);
+    inp.onblur=()=>queueNumIfValid(key,inp);
     container.appendChild(lab); container.appendChild(inp);
   }
 }
@@ -1382,7 +1412,9 @@ function mkBladeNum(key,label,step,min,val){
   const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
   const inp=document.createElement("input"); inp.type="number"; inp.className="mono";
   if(step!=null)inp.step=step; if(min!=null)inp.min=min; inp.value=val;
-  inp.onchange=()=>sendNum(key,inp.value);
+  inp.oninput=()=>queueNumIfValid(key,inp);
+  inp.onchange=()=>queueNumIfValid(key,inp);
+  inp.onblur=()=>queueNumIfValid(key,inp);
   bladeGrid.appendChild(lab); bladeGrid.appendChild(inp);
 }
 
@@ -1393,7 +1425,9 @@ function mkOscSliderRow(container, key,label,min,max,step,val){
   range.type="range"; range.min=min; range.max=max; range.step=step; range.value=val;
   const num=document.createElement("input"); num.type="number"; num.className="mono"; num.min=min; num.max=max; num.step=step; num.value=val;
   range.oninput=()=>{ num.value=range.value; sendNum(key,range.value); };
-  num.onchange=()=>{ range.value=num.value; sendNum(key,num.value); };
+  num.oninput=()=>{ range.value=num.value; queueNumIfValid(key,num); };
+  num.onchange=()=>{ range.value=num.value; queueNumIfValid(key,num); };
+  num.onblur=()=>queueNumIfValid(key,num);
   container.appendChild(lab); container.appendChild(range); container.appendChild(num);
 }
 function mkOscSelectRow(container, key,label,options,val){
