@@ -153,6 +153,8 @@ DASHBORD:
     N S E W direction and cartesian coordinates direction legend 
 
 
+In the foxglove studio simulation, i want to add another sensor "CAMERA" to the Scanner system, the FOV of the camera being HAOV = 1.5 2 degree, VAOV = 2 degree, it should also gaze at the hub ctr, so give me a 3d FOV with distance terminating at the hub, it is mounted 10 cm above the scanner laser
+
     
     
     
