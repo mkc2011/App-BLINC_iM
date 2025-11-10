@@ -25,9 +25,10 @@ except Exception:
 
 # ---- Inline assets for header logos (served via /img/gt and /img/px) ----
 _ASSETS = {}
+_ASSET_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "assets"))
 _ASSET_PATHS = {
-    "gt":  os.path.join(os.path.dirname(__file__), "logo_GTMW.png"),
-    "px":  os.path.join(os.path.dirname(__file__), "uquc2uky.png"),
+    "gt":  os.path.join(_ASSET_ROOT, "logo_GTMW.png"),
+    "px":  os.path.join(_ASSET_ROOT, "logo_Pixxon.png"),
 }
 for key, path in _ASSET_PATHS.items():
     try:

@@ -25,10 +25,22 @@ except Exception:
 
 # ---- Inline assets for header logos (served via /img/gt and /img/px) ----
 _ASSETS = {}
+_ASSET_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "assets"))
 _ASSET_PATHS = {
-    "gt":  os.path.join(os.path.dirname(__file__), "logo_GTMW.png"),
-    "px":  os.path.join(os.path.dirname(__file__), "uquc2uky.png"),
+    "gt": os.path.join(_ASSET_ROOT, "logo_GTMW.png"),
+    "px": os.path.join(_ASSET_ROOT, "logo_Pixxon.png"),
 }
+
+print("[DEBUG] __file__ dir:", os.path.dirname(__file__))
+for k, p in _ASSET_PATHS.items():
+    print(f"[DEBUG] Expecting {k} at: {p}  exists={os.path.exists(p)}")
+    try:
+        print("[DEBUG] Dir contents:", os.listdir(os.path.dirname(p)))
+    except Exception as e:
+        print("[DEBUG] Could not list dir:", e)
+
+
+
 for key, path in _ASSET_PATHS.items():
     try:
         with open(path, "rb") as f:
@@ -742,10 +754,69 @@ _HTML = """<!doctype html>
 
  .card { background:var(--card-bg); padding: 12px; border:1px solid var(--border); border-radius:12px; box-shadow: var(--shadow); }
  .banner { background: var(--banner-bg); border:1px solid var(--border); padding:8px 10px; border-radius:8px; margin: -2px -2px 12px; font-size: 14px; font-weight:800; letter-spacing:.4px; }
+ 
+
+ 
+/* --- SP Top View Card (dots only) --- */
+ .sp-card{ width:100%; max-width:100%; }
+ .sp-card .svgWrap{ display:flex; justify-content:center; }
+ svg.spview{ width:100%; max-width:336px; height:auto; }
+svg.spview .ring{ fill:none; stroke:#0e3c50; stroke-width:2; }
+svg.spview .hubline{ stroke:#999; stroke-width:6; }
+svg.spview .spdot{ fill:#4a241a; stroke:#111; stroke-width:2; }
+svg.spview .spdot.current{ fill:#2e7d32; }  /* highlight current SP */
+svg.spview .t0{ fill:#0e2a35; }
+svg.spview text{ font-weight:800; font-size:14px; }
+/* nacelle (top view) sitting on the rotor axis */
+svg.spview .nacelle {
+  fill:#1e637b;        /* body */
+  stroke:#0e3c50;      /* outline */
+  stroke-width:2;
+  rx:3; ry:3;          /* soft corners */
+}
+
+/* optional hub at the nacelle center */
+svg.spview .hub { fill:#0e3c50; }
+
+
+
+
+
 
  /* Mild green for Initial Inputs card */
  .initial-card { background:#e8f5e9; border-color:#cfe9d4; }
  .initial-card .banner { background: linear-gradient(180deg, #eaf7ee, #d9f0e0); border-color:#cfe9d4; }
+ /* Full-width horizontal initial inputs bar */
+ .initial-full { 
+   width: 100%; 
+   margin-bottom: 16px; 
+ }
+ 
+ /* Make the inner grid flow left→right in one line (scroll if overflow) */
+ .initial-full .initGrid {
+   display: grid;
+   grid-auto-flow: column;
+   grid-auto-columns: max-content; /* each item sizes to its content */
+   gap: 8px 12px;
+   align-items: center;
+   overflow-x: auto;     /* allow horizontal scroll if it can’t fit */
+   white-space: nowrap;  /* keep on one visual line */
+   padding-bottom: 4px;  /* little space above scrollbar (if any) */
+ }
+ 
+ /* Keep inputs compact for horizontal layout */
+ .initial-full input[type=number],
+ .initial-full input[type=text],
+ .initial-full select {
+   width: auto;          /* don't stretch */
+   max-width: none;
+ }
+ 
+ /* Tighten label spacing a bit in the horizontal line */
+ .initial-full .rowlabel {
+   margin-right: 6px;
+ }
+
 
  .subbanner { background:#f8fafc; border:1px dashed var(--border); padding:6px 8px; border-radius:8px; margin: 6px 0 8px; font-size: 12px; font-weight:800; letter-spacing:.3px; }
  .grid { display:grid; grid-template-columns: 200px 1fr 110px; gap: 10px 12px; align-items:center; }
@@ -759,14 +830,29 @@ _HTML = """<!doctype html>
  th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; font-size: 12px; }
  th { background: #f5f5f5; }
  .section { background:#fafafa; font-weight:800; }
- .row-top { display:grid; gap:16px; }
- .row-bottom { display:grid; gap:16px; }
- .row-mid { display:grid; gap:16px; align-items:start; }
- @media (min-width: 1200px){
-   .row-top   { grid-template-columns: 360px 1fr 1fr; }
-   .row-bottom{ grid-template-columns: 1fr 1fr 1fr 1fr; }
-   .row-mid { grid-template-columns: auto auto auto; justify-content: start; }
+ .section-block { display:flex; flex-direction:column; gap:16px; margin-top:28px; padding:24px 26px; background:rgba(243,245,248,0.9); border:1px solid rgba(17,17,17,0.12); border-radius:18px; box-shadow: var(--shadow); }
+ .section-block:first-of-type { margin-top:0; }
+ .section-title { font-size:27px; font-weight:800; letter-spacing:.4px; color:#1a1a1a; }
+ .section-row { display:grid; gap:16px; align-items:stretch; }
+ .section-row.two-wide { grid-template-columns: minmax(320px, 1.8fr) minmax(220px, 1fr); }
+ .section-row.three { grid-template-columns: minmax(152px, max-content) minmax(240px, 1fr) minmax(240px, 1fr); justify-content:flex-start; }
+ .section-row.four { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+ .section-row.dual { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+ @media (max-width: 1100px){
+   .section-row.two-wide { grid-template-columns: 1fr; }
  }
+ @media (max-width: 900px){
+   .section-row.three,
+   .section-row.four { grid-template-columns: 1fr; }
+ }
+ .tab-container { display:flex; flex-direction:column; gap:16px; }
+ .tab-buttons { display:flex; gap:10px; flex-wrap:wrap; }
+ .tab-btn { padding:10px 18px; border:1px solid var(--border); border-radius:8px; background:#fff; font-weight:700; letter-spacing:.3px; cursor:pointer; transition:all .2s ease; }
+ .tab-btn:hover { background:#eef2f7; }
+ .tab-btn.active { background:#1e637b; color:#fff; border-color:#1e637b; box-shadow:0 6px 16px rgba(30,99,123,.25); }
+ .tab-panels { display:flex; flex-direction:column; gap:24px; }
+ .tab-panel { display:none; flex-direction:column; gap:24px; }
+ .tab-panel.active { display:flex; }
  .initGrid  { display:grid; grid-template-columns: minmax(120px, 1fr) minmax(120px, 1.2fr); gap: 8px 10px; align-items:center; }
  .bladeGrid { display:grid; grid-template-columns: minmax(180px, 1fr) minmax(120px, 1fr); gap: 10px 12px; align-items:center; margin-top:8px; }
 
@@ -790,19 +876,19 @@ _HTML = """<!doctype html>
  .foot-title{ font-weight:800; font-size:13px; letter-spacing:.4px; }
 
  /* Schematic */
- .wtg-card{ width: 580; }
- @media (max-width: 1200px){ .wtg-card{ width: 100%; } }
+ .wtg-card{ width:100%; max-width:100%; }
  .svgWrap { display:flex; justify-content:center; }
  svg.schem { width:100%; max-width:260px; height:auto; }
  svg.schem .thin { stroke:#111; stroke-width:2; fill:none; }
  svg.schem .dash { stroke-dasharray:8 8; }
- svg.schem text { font-weight:800; font-size:14px; }
+ svg.schem text { font-weight:800; font-size:28px; }
  svg.schem #txtDia, svg.schem #txtHub { font-size:28px; }
  svg.schem #txtLoc { font-size:28px; }
 
  /* Yaw Orientation card */
+ .yaw-card{ width:100%; max-width:100%; }
  .yaw-card .svgYawWrap{ display:flex; flex-direction:column; gap:8px; justify-content:center; align-items:center; }
- svg.yawviz { width:100%; max-width:420px; height:auto; }
+ svg.yawviz { width:100%; max-width:336px; height:auto; }
  svg.yawviz .thin{ stroke:#113A5C; stroke-width:2; fill:none; }
  svg.yawviz .ref{ stroke-dasharray:6 6; stroke:#2B6CB0; }
  svg.yawviz .hub{ fill:#111; }
@@ -827,164 +913,383 @@ _HTML = """<!doctype html>
     </div>
   </div>
 
-  <!-- ROW 1 -->
-  <div class="row-top">
-    <div class="card initial-card">
+    <div class="tab-container">
+    <div class="tab-buttons">
+      <button class="tab-btn active" data-tab="tabOverview">Overview</button>
+      <button class="tab-btn" data-tab="tabControls">Controls</button>
+    </div>
+    <div class="tab-panels">
+      <section class="tab-panel active" id="tabOverview">
+<section class="section-block">
+    <div class="section-title">INIT</div>
+    <div class="card initial-card initial-full">
       <div class="banner">INITIAL INPUTS</div>
-      <div class="initGrid" id="initialGrid"></div>
-      <div class="muted" style="margin-top:8px;">ENTER WTG GPS AS N (LAT), E (LON). NO ALTITUDE.</div>
+      <div class="initGrid" id="initialGridTab1"></div>
+      <div class="muted" style="margin-top:6px;">ENTER WTG GPS AS N (LAT), E (LON). NO ALTITUDE.</div>
     </div>
+  </section>
 
-    <div class="card">
-      <div class="banner">WTG INFO</div>
-      <table id="wtg"></table>
-    </div>
+  <section class="section-block">
+    <div class="section-title">TRACKER</div>
+    <div class="section-row two-wide">
+      <div class="card wtg-card">
+        <div class="banner">WTG INPUT PARAMETERS</div>
+        <div class="svgWrap">
+          <svg class="schem" viewBox="0 0 540 720" aria-label="WTG schematic">
+            <defs>
+              <marker id="arrowTracker" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M0,0 L8,4 L0,8 Z" fill="#111" />
+              </marker>
+            </defs>
 
-    <div class="card">
-      <div class="banner">STATUS MONITORING</div>
-      <table id="status"></table>
-    </div>
-  </div>
+            <!-- Rotor disk (static) -->
+            <circle cx="270" cy="260" r="160" class="thin dash"/>
 
-  <!-- ROW 2 -->
-  <div class="row-bottom" style="margin-top:16px;">
-    <div class="card">
-      <div class="banner">LIVE CONTROLS</div>
-      <div class="grid" id="grid"></div>
+            <!-- Tower (static) -->
+            <rect x="267" y="260" width="6" height="300" fill="#111"/>
 
-      <details class="fold" id="bladeFold">
-        <summary>BLADE PARAMETERS</summary>
-        <div class="bladeGrid" id="bladeGrid"></div>
-      </details>
-
-      <div style="margin-top:10px">
-        <button onclick="refresh()">REFRESH</button>
-        <span class="muted">EDIT NUMBERS OR MOVE SLIDERS; UPDATES SEND INSTANTLY.</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="banner">WTG COORDINATES</div>
-      <table id="coords"></table>
-    </div>
-
-    <div class="card">
-      <div class="banner">PT MOTOR DATA</div>
-      <div class="subbanner">SCANNER</div>
-      <table id="pt_scanner"></table>
-      <div class="subbanner">TRACKER</div>
-      <table id="pt_tracker"></table>
-    </div>
-
-    <!-- NEW: Yaw Oscillation Card -->
-    <div class="card">
-      <div class="banner">YAW OSCILLATION</div>
-      <div class="grid" id="oscGrid"></div>
-      <div class="muted" style="margin-top:6px;">
-        MODE: OFF disables oscillation. SINE uses amplitude ±MAX and frequency (Hz).
-        RANDOM performs a bounded random walk. <b>Yaw rate</b> caps slew speed.
-      </div>
-    </div>
-  </div>
-
-  <!-- ROW 3: WTG schematic + blade counter + yaw orientation -->
-  <div class="row-mid" style="margin-top:16px;">
-    <div class="card wtg-card">
-      <div class="banner">WTG INPUT PARAMETERS</div>
-      <div class="svgWrap">
-        <svg class="schem" viewBox="0 0 540 720" aria-label="WTG schematic">
-          <defs>
-            <marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto" markerUnits="userSpaceOnUse">
-              <path d="M0,0 L8,4 L0,8 Z" fill="#111" />
-            </marker>
-          </defs>
-
-          <!-- Rotor disk (static) -->
-          <circle cx="270" cy="260" r="160" class="thin dash"/>
-
-          <!-- Tower (static) -->
-          <rect x="267" y="260" width="6" height="300" fill="#111"/>
-
-          <!-- BEGIN: parts that rotate with YAW -->
-          <g id="yawGroup" transform="rotate(0,270,260)">
-            <!-- hub -->
-            <circle cx="270" cy="260" r="6" fill="#111"/>
-            <!-- three blades; this group rotates about the hub -->
-            <line x1="270" y1="260" x2="270" y2="90"  class="thin"/>
-            <line x1="270" y1="260" x2="125" y2="340" class="thin"/>
-            <line x1="270" y1="260" x2="415" y2="340" class="thin"/>
-          </g>
-          <!-- END: parts that rotate with YAW -->
-
-          <!-- Nacelle marker (optional, static) -->
-          <g transform="translate(270,590)">
-            <g transform="scale(0.6)">
-              <path d="M0,0 c-12,0 -22,10 -22,22 c0,18 22,42 22,42 s22,-24 22,-42 c0,-12 -10,-22 -22,-22 z" fill="#111"/>
-              <circle cx="0" cy="22" r="8" fill="#fff"/>
+            <!-- BEGIN: parts that rotate with YAW -->
+            <g id="yawGroupTracker" transform="rotate(0,270,260)">
+              <!-- hub -->
+              <circle cx="270" cy="260" r="6" fill="#111"/>
+              <!-- three blades; this group rotates about the hub -->
+              <line x1="270" y1="260" x2="270" y2="90"  class="thin"/>
+              <line x1="270" y1="260" x2="125" y2="340" class="thin"/>
+              <line x1="270" y1="260" x2="415" y2="340" class="thin"/>
             </g>
-          </g>
+            <!-- END: parts that rotate with YAW -->
 
-          <!-- Rotor dia dimension -->
-          <line x1="110" y1="120" x2="110" y2="58"  class="thin"/>
-          <line x1="430" y1="120" x2="430" y2="58"  class="thin"/>
-          <line x1="110" y1="58"  x2="430" y2="58"  class="thin" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
-          <text id="txtDia" x="270" y="38" text-anchor="middle">ROTOR DIA: – M</text>
-          <!-- Hub ht dimension -->
-          <line x1="120" y1="560" x2="58"  y2="560" class="thin"/>
-          <line x1="120" y1="260" x2="58"  y2="260" class="thin"/>
-          <line x1="58"  y1="560" x2="58"  y2="260" class="thin" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
-          <text id="txtHub" x="28" y="410" text-anchor="middle" transform="rotate(-90,28,410)">HUB HT: – M</text>
-          <!-- Location coords centered -->
-          <text id="txtLoc" x="50%" y="680" text-anchor="middle">(–, –)</text>
-        </svg>
+            <!-- Nacelle marker (optional, static) -->
+            <g transform="translate(270,590)">
+              <g transform="scale(0.6)">
+                <path d="M0,0 c-12,0 -22,10 -22,22 c0,18 22,42 22,42 s22,-24 22,-42 c0,-12 -10,-22 -22,-22 z" fill="#111"/>
+                <circle cx="0" cy="22" r="8" fill="#fff"/>
+              </g>
+            </g>
+
+            <!-- Rotor dia dimension -->
+            <line x1="110" y1="120" x2="110" y2="58"  class="thin"/>
+            <line x1="430" y1="120" x2="430" y2="58"  class="thin"/>
+            <line x1="110" y1="58"  x2="430" y2="58"  class="thin" marker-start="url(#arrowTracker)" marker-end="url(#arrowTracker)"/>
+            <text id="txtDiaTracker" x="270" y="38" text-anchor="middle">ROTOR DIA: ? M</text>
+            <!-- Hub ht dimension -->
+            <line x1="120" y1="560" x2="58"  y2="560" class="thin"/>
+            <line x1="120" y1="260" x2="58"  y2="260" class="thin"/>
+            <line x1="58"  y1="560" x2="58"  y2="260" class="thin" marker-start="url(#arrowTracker)" marker-end="url(#arrowTracker)"/>
+            <text id="txtHubTracker" x="28" y="410" text-anchor="middle" transform="rotate(-90,28,410)">HUB HT: ? M</text>
+            <!-- Location coords centered -->
+            <text id="txtLocTracker" x="50%" y="680" text-anchor="middle">(?, ?)</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="banner">WTG INFO</div>
+        <table id="wtgTracker"></table>
       </div>
     </div>
 
-    <div class="blade-card">
-      <div class="blade-head">BLADE COUNTER</div>
-      <div class="blade-body">
-        <div class="blade-row">
-          <div id="b1Dot" class="dot dot-red idle"><span>B1</span></div>
-          <div id="b1Count" class="countBox">0</div>
+    <div class="section-row three">
+      <div class="blade-card">
+        <div class="blade-head">BLADE COUNTER</div>
+        <div class="blade-body">
+          <div class="blade-row">
+            <div id="b1Dot" class="dot dot-red idle"><span>B1</span></div>
+            <div id="b1Count" class="countBox">0</div>
+          </div>
+          <div class="blade-row">
+            <div id="b2Dot" class="dot dot-green idle"><span>B2</span></div>
+            <div id="b2Count" class="countBox">0</div>
+          </div>
+          <div class="blade-row">
+            <div id="b3Dot" class="dot dot-blue idle"><span>B3</span></div>
+            <div id="b3Count" class="countBox">0</div>
+          </div>
         </div>
-        <div class="blade-row">
-          <div id="b2Dot" class="dot dot-green idle"><span>B2</span></div>
-          <div id="b2Count" class="countBox">0</div>
-        </div>
-        <div class="blade-row">
-          <div id="b3Dot" class="dot dot-blue idle"><span>B3</span></div>
-          <div id="b3Count" class="countBox">0</div>
+        <div class="blade-foot">
+          <div class="foot-title">TOTAL</div>
+          <div id="bladeTotal" class="countBox count-total">0</div>
         </div>
       </div>
-      <div class="blade-foot">
-        <div class="foot-title">TOTAL</div>
-        <div id="bladeTotal" class="countBox count-total">0</div>
+
+      <div class="card">
+        <div class="banner">LIVE STATUS MONITORING</div>
+        <table id="statusTracker"></table>
+      </div>
+
+      <div class="card yaw-card">
+        <div class="banner">CURRENT YAW CHANGE</div>
+        <div class="svgYawWrap">
+          <svg class="yawviz" id="yawVizTracker" viewBox="0 0 640 520" aria-label="Yaw orientation">
+            <rect x="30" y="20" width="580" height="480" rx="60" ry="60" fill="none" stroke="#111" stroke-width="2"/>
+            <line x1="320" y1="40" x2="320" y2="480" class="ref" stroke-width="2"/>
+            <circle cx="320" cy="260" r="170" class="thin"/>
+            <circle cx="320" cy="430" r="8" class="marker"/>
+
+            <g id="yawGroupVizTracker" transform="rotate(0,320,260)">
+              <rect x="311" y="232" width="18" height="28" rx="3" class="nacelle"/>
+              <circle cx="320" cy="260" r="8" class="hub"/>
+              <line x1="140" y1="260" x2="500" y2="260" class="blade"/>
+              <line x1="320" y1="260" x2="320" y2="295" class="blade" stroke-width="2"/>
+            </g>
+            <text id="yawTextTracker" x="338" y="302">θ = 0.0°</text>
+          </svg>
+        </div>
       </div>
     </div>
 
-    <!-- Yaw Orientation Card (no invert control) -->
-    <div class="card yaw-card">
-      <div class="banner">WTG ORIENTATION</div>
-      <div class="svgYawWrap">
-        <svg class="yawviz" id="yawViz" viewBox="0 0 640 520" aria-label="Yaw orientation">
-          <rect x="30" y="20" width="580" height="480" rx="60" ry="60" fill="none" stroke="#111" stroke-width="2"/>
-          <line x1="320" y1="40" x2="320" y2="480" class="ref" stroke-width="2"/>
-          <circle cx="320" cy="260" r="170" class="thin"/>
-          <circle cx="320" cy="430" r="8" class="marker"/>
 
-          <g id="yawGroupViz" transform="rotate(0,320,260)">
-            <rect x="311" y="232" width="18" height="28" rx="3" class="nacelle"/>
-            <circle cx="320" cy="260" r="8" class="hub"/>
-            <line x1="140" y1="260" x2="500" y2="260" class="blade"/>
-            <line x1="320" y1="260" x2="320" y2="295" class="blade" stroke-width="2"/>
-          </g>
-          <text id="yawText" x="338" y="302">θ = 0.0°</text>
-        </svg>
+  </section>
+
+  <section class="section-block">
+    <div class="section-title">SCANNER</div>
+    <div class="section-row two-wide">
+      <div class="card wtg-card">
+        <div class="banner">WTG INPUT PARAMETERS</div>
+        <div class="svgWrap">
+          <svg class="schem" viewBox="0 0 540 720" aria-label="WTG schematic">
+            <defs>
+              <marker id="arrowScanner" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+                <path d="M0,0 L8,4 L0,8 Z" fill="#111" />
+              </marker>
+            </defs>
+
+            <!-- Rotor disk (static) -->
+            <circle cx="270" cy="260" r="160" class="thin dash"/>
+
+            <!-- Tower (static) -->
+            <rect x="267" y="260" width="6" height="300" fill="#111"/>
+
+            <!-- BEGIN: parts that rotate with YAW -->
+            <g id="yawGroupScanner" transform="rotate(0,270,260)">
+              <!-- hub -->
+              <circle cx="270" cy="260" r="6" fill="#111"/>
+              <!-- three blades; this group rotates about the hub -->
+              <line x1="270" y1="260" x2="270" y2="90"  class="thin"/>
+              <line x1="270" y1="260" x2="125" y2="340" class="thin"/>
+              <line x1="270" y1="260" x2="415" y2="340" class="thin"/>
+            </g>
+            <!-- END: parts that rotate with YAW -->
+
+            <!-- Nacelle marker (optional, static) -->
+            <g transform="translate(270,590)">
+              <g transform="scale(0.6)">
+                <path d="M0,0 c-12,0 -22,10 -22,22 c0,18 22,42 22,42 s22,-24 22,-42 c0,-12 -10,-22 -22,-22 z" fill="#111"/>
+                <circle cx="0" cy="22" r="8" fill="#fff"/>
+              </g>
+            </g>
+
+            <!-- Rotor dia dimension -->
+            <line x1="110" y1="120" x2="110" y2="58"  class="thin"/>
+            <line x1="430" y1="120" x2="430" y2="58"  class="thin"/>
+            <line x1="110" y1="58"  x2="430" y2="58"  class="thin" marker-start="url(#arrowScanner)" marker-end="url(#arrowScanner)"/>
+            <text id="txtDiaScanner" x="270" y="38" text-anchor="middle">ROTOR DIA: ? M</text>
+            <!-- Hub ht dimension -->
+            <line x1="120" y1="560" x2="58"  y2="560" class="thin"/>
+            <line x1="120" y1="260" x2="58"  y2="260" class="thin"/>
+            <line x1="58"  y1="560" x2="58"  y2="260" class="thin" marker-start="url(#arrowScanner)" marker-end="url(#arrowScanner)"/>
+            <text id="txtHubScanner" x="28" y="410" text-anchor="middle" transform="rotate(-90,28,410)">HUB HT: ? M</text>
+            <!-- Location coords centered -->
+            <text id="txtLocScanner" x="50%" y="680" text-anchor="middle">(?, ?)</text>
+          </svg>
+        </div>
       </div>
+
+      <div class="card">
+        <div class="banner">WTG INFO</div>
+        <table id="wtgScanner"></table>
+      </div>
+    </div>
+
+    <div class="section-row three">
+      <div class="card">
+        <div class="banner">LIVE STATUS MONITORING</div>
+        <table id="statusScanner"></table>
+      </div>
+
+      <div class="card yaw-card">
+        <div class="banner">CURRENT YAW CHANGE</div>
+        <div class="svgYawWrap">
+          <svg class="yawviz" id="yawVizScanner" viewBox="0 0 640 520" aria-label="Yaw orientation">
+            <rect x="30" y="20" width="580" height="480" rx="60" ry="60" fill="none" stroke="#111" stroke-width="2"/>
+            <line x1="320" y1="40" x2="320" y2="480" class="ref" stroke-width="2"/>
+            <circle cx="320" cy="260" r="170" class="thin"/>
+            <circle cx="320" cy="430" r="8" class="marker"/>
+
+            <g id="yawGroupVizScanner" transform="rotate(0,320,260)">
+              <rect x="311" y="232" width="18" height="28" rx="3" class="nacelle"/>
+              <circle cx="320" cy="260" r="8" class="hub"/>
+              <line x1="140" y1="260" x2="500" y2="260" class="blade"/>
+              <line x1="320" y1="260" x2="320" y2="295" class="blade" stroke-width="2"/>
+            </g>
+            <text id="yawTextScanner" x="338" y="302">θ = 0.0°</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="card sp-card">
+        <div class="banner">CURRENT SCANNER POS</div>
+        <div class="svgWrap">
+          <svg id="spTopView" class="spview" viewBox="0 0 560 560" aria-label="Scanner positions top view">
+            <defs>
+              <marker id="spArrow" markerWidth="12" markerHeight="12" refX="6" refY="6" orient="auto">
+                <path d="M0,0 L12,6 L0,12 z" />
+              </marker>
+            </defs>
+
+            <!-- boundary & turbine -->
+            <circle cx="280" cy="280" r="260" class="ring"/>
+            <line x1="60" y1="280" x2="500" y2="280" class="hubline"/>
+
+            <!-- NACELLE (top view) centered on the axis + hub dot) -->
+            <rect class="nacelle" x="270" y="260" width="20" height="40"></rect>
+            <circle class="hub" cx="280" cy="280" r="6"></circle>
+
+            <!-- dots (positions) -->
+            <circle id="spTop_SP4" cx="120" cy="280" r="14" class="spdot"/>
+            <text   x="120" y="256" text-anchor="middle">SP_4</text>
+
+            <circle id="spTop_SP1" cx="420" cy="420" r="14" class="spdot"/>
+            <text   x="420" y="450" text-anchor="middle">SP_1</text>
+
+            <circle id="spTop_SP2" cx="420" cy="320" r="14" class="spdot"/>
+            <text   x="420" y="296" text-anchor="middle">SP_2</text>
+
+            <circle id="spTop_SP3" cx="420" cy="140" r="14" class="spdot"/>
+            <text   x="420" y="116" text-anchor="middle">SP_3</text>
+
+            <!-- T_0 centered under the hub, responsive -->
+            <circle class="t0" cx="50%" cy="86%" r="14"></circle>
+            <text x="50%" y="90%" text-anchor="middle">T_0</text>
+
+            <!-- optional arrows to suggest motion (static) -->
+            <path d="M420,420  420,320" class="arrow"/>
+            <path d="M420,320  420,140" class="arrow"/>
+            <path d="M420,140  120,280" class="arrow"/>
+            <path d="M120,280  420,420" class="arrow"/>
+          </svg>
+        </div>
+
+        <div class="muted" style="text-align:center; margin-top:6px;">
+          CURRENT POSITION = <span id="spTopLabel" class="mono">?</span>
+        </div>
+      </div>
+    </div>
+  </section>
+      </section>
+      <section class="tab-panel" id="tabControls">
+        <section class="section-block">
+          <div class="section-title">INIT</div>
+          <div class="card initial-card initial-full">
+            <div class="banner">INITIAL INPUTS</div>
+            <div class="initGrid" id="initialGridTab2"></div>
+            <div class="muted" style="margin-top:6px;">ENTER WTG GPS AS N (LAT), E (LON). NO ALTITUDE.</div>
+          </div>
+        </section>
+        <section class="section-block">
+
+          <div class="section-title">SIMULATION CTRLS</div>
+
+          <div class="section-row dual">
+
+            <div class="card">
+
+              <div class="banner">LIVE CONTROLS</div>
+
+              <div class="grid" id="liveControlsGrid"></div>
+
+
+
+              <details class="fold" id="bladeFold">
+
+                <summary>BLADE PARAMETERS</summary>
+
+                <div class="bladeGrid" id="bladeGrid"></div>
+
+              </details>
+
+
+
+              <div style="margin-top:10px">
+
+                <button onclick="refresh()">REFRESH</button>
+
+                <span class="muted">EDIT NUMBERS OR MOVE SLIDERS; UPDATES SEND INSTANTLY.</span>
+
+              </div>
+
+            </div>
+
+
+
+            <div class="card">
+
+              <div class="banner">YAW OSCILLATION</div>
+
+              <div class="grid" id="oscGrid"></div>
+
+              <div class="muted" style="margin-top:6px;">
+
+                MODE: OFF disables oscillation. SINE uses amplitude ±MAX and frequency (Hz).
+
+                RANDOM performs a bounded random walk. <b>Yaw rate</b> caps slew speed.
+
+              </div>
+
+            </div>
+
+          </div>
+
+          <div class="section-title">DIAGNOSTIC DATA</div>
+
+          <div class="section-row dual">
+
+            <div class="card">
+
+              <div class="banner">WTG COORDINATES</div>
+
+              <table id="coords"></table>
+
+            </div>
+
+
+
+            <div class="card">
+
+              <div class="banner">PT MOTOR DATA</div>
+
+              <div class="subbanner">SCANNER</div>
+
+              <table id="pt_scanner"></table>
+
+              <div class="subbanner">TRACKER</div>
+
+              <table id="pt_tracker"></table>
+
+            </div>
+
+          </div>
+
+        </section>
+      </section>
     </div>
   </div>
+
 
 <script>
+
+function renderSPTopView(s){
+  const which = (s.scanner_sp || "").toUpperCase();
+  for(const id of ["SP1","SP2","SP3","SP4"]){
+    const el = document.getElementById("spTop_"+id);
+    if(el) el.classList.toggle("current", which === id);
+  }
+  const lab = document.getElementById("spTopLabel");
+  if(lab) lab.textContent = which || "—";
+}
+
+
+
 const wrapDeg=(a)=>((a+180)%360+360)%360-180;
 
 const FIELDS=[["yaw_deg","YAW (DEG)",-180,180,0.1],["yaw_rate_deg_s","YAW RATE (DEG/S)",-60,60,0.1],["rotor_rpm","ROTOR RPM",0,60,0.1]];
@@ -1008,50 +1313,109 @@ const OSC_RANDOM_FIELDS = [
   ["yaw_osc_random_step_deg","RANDOM STEP (DEG)", 0, 30, 0.5],
 ];
 
-const grid=document.getElementById("grid");
-const initialGrid=document.getElementById("initialGrid");
+const initialGrids=[document.getElementById("initialGridTab1"),document.getElementById("initialGridTab2")].filter(Boolean);
 const bladeGrid=document.getElementById("bladeGrid");
-const tblWTG=document.getElementById("wtg");
-const tblSTATUS=document.getElementById("status");
+const liveControlsGrid=document.getElementById("liveControlsGrid");
+const wtgTables=[document.getElementById("wtgTracker"),document.getElementById("wtgScanner")].filter(Boolean);
+const statusTables=[document.getElementById("statusTracker"),document.getElementById("statusScanner")].filter(Boolean);
 const tblCRD=document.getElementById("coords");
 const tblPTScanner=document.getElementById("pt_scanner");
 const tblPTTracker=document.getElementById("pt_tracker");
 const oscGrid=document.getElementById("oscGrid");
+const schematicTargets=[
+  {yawGroup:"yawGroupTracker",txtDia:"txtDiaTracker",txtHub:"txtHubTracker",txtLoc:"txtLocTracker"},
+  {yawGroup:"yawGroupScanner",txtDia:"txtDiaScanner",txtHub:"txtHubScanner",txtLoc:"txtLocScanner"}
+];
+const yawVizTargets=[
+  {group:"yawGroupVizTracker",text:"yawTextTracker"},
+  {group:"yawGroupVizScanner",text:"yawTextScanner"}
+];
+const tabButtons=Array.from(document.querySelectorAll(".tab-btn"));
+const tabPanels=Array.from(document.querySelectorAll(".tab-panel"));
+
+tabButtons.forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    const target=btn.dataset.tab;
+    if(!target) return;
+    tabButtons.forEach(b=>b.classList.toggle("active", b===btn));
+    tabPanels.forEach(panel=>panel.classList.toggle("active", panel.id===target));
+  });
+});
+
+const INPUT_DEBOUNCE_MS = 180;
+const inputDebouncers = new Map();
+function debounceSend(key, value, mode){
+  if(inputDebouncers.has(key)){
+    clearTimeout(inputDebouncers.get(key));
+  }
+  const timer=setTimeout(()=>{
+    inputDebouncers.delete(key);
+    if(mode==="text"){ sendText(key, value); }
+    else{ sendNum(key, value); }
+  }, INPUT_DEBOUNCE_MS);
+  inputDebouncers.set(key, timer);
+}
+function queueNumIfValid(key, inputEl){
+  if(!inputEl) return;
+  const value=inputEl.value;
+  if(value==="" || !inputEl.checkValidity()) return;
+  debounceSend(key, value, "number");
+}
+function queueText(key, inputEl){
+  if(!inputEl) return;
+  debounceSend(key, inputEl.value, "text");
+}
 
 function mkSliderRow(key,label,min,max,step,val){
+  if(!liveControlsGrid) return;
   const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
   const range=document.createElement("input");
   range.type="range"; range.min=min; range.max=max; range.step=step; range.value=val;
   const num=document.createElement("input"); num.type="number"; num.className="mono"; num.min=min; num.max=max; num.step=step; num.value=val;
   range.oninput=()=>{ num.value=range.value; sendNum(key,range.value); };
-  num.onchange=()=>{ range.value=num.value; sendNum(key,num.value); };
-  grid.appendChild(lab); grid.appendChild(range); grid.appendChild(num);
+  num.oninput=()=>{ range.value=num.value; queueNumIfValid(key,num); };
+  num.onchange=()=>{ range.value=num.value; queueNumIfValid(key,num); };
+  num.onblur=()=>queueNumIfValid(key,num);
+  liveControlsGrid.appendChild(lab); liveControlsGrid.appendChild(range); liveControlsGrid.appendChild(num);
 }
 function mkSelectRow(key,label,options,val){
+  if(!liveControlsGrid) return;
   const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
   const sel=document.createElement("select");
   for(const o of options){ const op=document.createElement("option"); op.value=o; op.textContent=o; if(o===val)op.selected=true; sel.appendChild(op); }
   sel.onchange=()=>sendText(key,sel.value);
   const spacer=document.createElement("div");
-  grid.appendChild(lab); grid.appendChild(sel); grid.appendChild(spacer);
+  liveControlsGrid.appendChild(lab); liveControlsGrid.appendChild(sel); liveControlsGrid.appendChild(spacer);
 }
 function mkInitText(key,label,val){
-  const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
-  const inp=document.createElement("input"); inp.type="text"; inp.className="mono"; inp.value=val;
-  inp.onchange=()=>sendText(key,inp.value);
-  initialGrid.appendChild(lab); initialGrid.appendChild(inp);
+  for(const container of initialGrids){
+    if(!container) continue;
+    const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
+    const inp=document.createElement("input"); inp.type="text"; inp.className="mono"; inp.value=val;
+    inp.oninput=()=>queueText(key,inp);
+    inp.onchange=()=>queueText(key,inp);
+    inp.onblur=()=>queueText(key,inp);
+    container.appendChild(lab); container.appendChild(inp);
+  }
 }
 function mkInitNum(key,label,step,val){
-  const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
-  const inp=document.createElement("input"); inp.type="number"; inp.className="mono"; inp.step=step; inp.value=val;
-  inp.onchange=()=>sendNum(key,inp.value);
-  initialGrid.appendChild(lab); initialGrid.appendChild(inp);
+  for(const container of initialGrids){
+    if(!container) continue;
+    const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
+    const inp=document.createElement("input"); inp.type="number"; inp.className="mono"; inp.step=step; inp.value=val;
+    inp.oninput=()=>queueNumIfValid(key,inp);
+    inp.onchange=()=>queueNumIfValid(key,inp);
+    inp.onblur=()=>queueNumIfValid(key,inp);
+    container.appendChild(lab); container.appendChild(inp);
+  }
 }
 function mkBladeNum(key,label,step,min,val){
   const lab=document.createElement("div"); lab.className="rowlabel"; lab.textContent=label;
   const inp=document.createElement("input"); inp.type="number"; inp.className="mono";
   if(step!=null)inp.step=step; if(min!=null)inp.min=min; inp.value=val;
-  inp.onchange=()=>sendNum(key,inp.value);
+  inp.oninput=()=>queueNumIfValid(key,inp);
+  inp.onchange=()=>queueNumIfValid(key,inp);
+  inp.onblur=()=>queueNumIfValid(key,inp);
   bladeGrid.appendChild(lab); bladeGrid.appendChild(inp);
 }
 
@@ -1062,7 +1426,9 @@ function mkOscSliderRow(container, key,label,min,max,step,val){
   range.type="range"; range.min=min; range.max=max; range.step=step; range.value=val;
   const num=document.createElement("input"); num.type="number"; num.className="mono"; num.min=min; num.max=max; num.step=step; num.value=val;
   range.oninput=()=>{ num.value=range.value; sendNum(key,range.value); };
-  num.onchange=()=>{ range.value=num.value; sendNum(key,num.value); };
+  num.oninput=()=>{ range.value=num.value; queueNumIfValid(key,num); };
+  num.onchange=()=>{ range.value=num.value; queueNumIfValid(key,num); };
+  num.onblur=()=>queueNumIfValid(key,num);
   container.appendChild(lab); container.appendChild(range); container.appendChild(num);
 }
 function mkOscSelectRow(container, key,label,options,val){
@@ -1078,20 +1444,22 @@ async function sendNum(key,value){ try{ await fetch(`/set?${encodeURIComponent(k
 async function sendText(key,value){ try{ await fetch(`/set?${encodeURIComponent(key)}=${encodeURIComponent(value)}`);}catch(e){} }
 
 function renderInfo(s){
-  const w=s.wtg_info;
-  tblWTG.innerHTML=`
+  const w=s.wtg_info||{};
+  const html=`
     <tr><th class="section">FIELD</th><th class="section">VALUE</th></tr>
-    <tr><td>MODEL NUMBER</td><td class="mono">${w.model_number}</td></tr>
-    <tr><td>ROTOR DIA (M)</td><td class="mono">${w.rotor_dia_m}</td></tr>
-    <tr><td>HUB HT (M)</td><td class="mono">${w.hub_ht_m}</td></tr>
-    <tr><td>SYSTEM HEIGHT (TIP, M)</td><td class="mono">${w.system_height_m}</td></tr>`;
+    <tr><td>MODEL NUMBER</td><td class="mono">${w.model_number??""}</td></tr>
+    <tr><td>ROTOR DIA (M)</td><td class="mono">${w.rotor_dia_m??""}</td></tr>
+    <tr><td>HUB HT (M)</td><td class="mono">${w.hub_ht_m??""}</td></tr>
+    <tr><td>SYSTEM HEIGHT (TIP, M)</td><td class="mono">${w.system_height_m??""}</td></tr>`;
+  for(const tbl of wtgTables){ if(tbl) tbl.innerHTML=html; }
 }
 function renderStatus(s){
-  const d=s.status;
-  tblSTATUS.innerHTML=`
+  const d=s.status||{};
+  const html=`
     <tr><th class="section">METRIC</th><th class="section">VALUE</th></tr>
-    <tr><td>ROTOR RPM</td><td class="mono">${d.rotor_rpm}</td></tr>
-    <tr><td>CURRENT YAW (DEG)</td><td class="mono">${d.current_yaw_deg}</td></tr>`;
+    <tr><td>ROTOR RPM</td><td class="mono">${d.rotor_rpm??""}</td></tr>
+    <tr><td>CURRENT YAW (DEG)</td><td class="mono">${d.current_yaw_deg??""}</td></tr>`;
+  for(const tbl of statusTables){ if(tbl) tbl.innerHTML=html; }
 }
 function renderCoords(s){
   const c=s.coordinates_cartesian, g=s.coordinates_gps;
@@ -1151,34 +1519,38 @@ function renderBladeCounter(s){
 
 /* Schematic labels + yaw-driven rotation (wrapped yaw) */
 function renderSchematic(s){
-  const dia=s?.wtg_info?.rotor_dia_m??"";
-  const hub=s?.wtg_info?.hub_ht_m??"";
+  const info=s?.wtg_info??{};
+  const dia=info.rotor_dia_m??"";
+  const hub=info.hub_ht_m??"";
   const lat=s?.wtg_lat??"";
   const lon=s?.wtg_lon??"";
 
   const yawRaw=Number(s?.status?.current_yaw_deg??0);
   const yaw=wrapDeg(yawRaw);
 
-  const tDia=document.getElementById("txtDia");
-  const tHub=document.getElementById("txtHub");
-  const tLoc=document.getElementById("txtLoc");
-  const yawGroup=document.getElementById("yawGroup");
+  for(const target of schematicTargets){
+    const yawGroup=document.getElementById(target.yawGroup);
+    if(yawGroup) yawGroup.setAttribute("transform",`rotate(${yaw.toFixed(2)},270,260)`);
 
-  if(tDia) tDia.textContent=`ROTOR DIA: ${dia} M`;
-  if(tHub) tHub.textContent=`HUB HT: ${hub} M`;
-  if(tLoc) tLoc.textContent=`(${lat}, ${lon})`;
-
-  if(yawGroup) yawGroup.setAttribute("transform",`rotate(${yaw.toFixed(2)},270,260)`);
+    const tDia=document.getElementById(target.txtDia);
+    if(tDia) tDia.textContent=`ROTOR DIA: ${dia} M`;
+    const tHub=document.getElementById(target.txtHub);
+    if(tHub) tHub.textContent=`HUB HT: ${hub} M`;
+    const tLoc=document.getElementById(target.txtLoc);
+    if(tLoc) tLoc.textContent=`(${lat}, ${lon})`;
+  }
 }
 
 /* Yaw Orientation card renderer (wrapped) */
 function renderYawViz(s){
   const yawRaw=Number(s?.status?.current_yaw_deg??0);
   const ang=wrapDeg(yawRaw);
-  const g=document.getElementById("yawGroupViz");
-  const t=document.getElementById("yawText");
-  if(g) g.setAttribute("transform",`rotate(${ang.toFixed(2)},320,260)`);
-  if(t) t.textContent=`θ = ${ang.toFixed(1)}°`;
+  for(const target of yawVizTargets){
+    const g=document.getElementById(target.group);
+    if(g) g.setAttribute("transform",`rotate(${ang.toFixed(2)},320,260)`);
+    const label=document.getElementById(target.text);
+    if(label) label.textContent=`θ = ${ang.toFixed(1)}°`;
+  }
 }
 
 async function refresh(){
@@ -1186,29 +1558,38 @@ async function refresh(){
     const pr=await fetch("/get"); const ps=await pr.json();
 
     // INITIAL INPUTS
-    initialGrid.innerHTML="";
+    for(const container of initialGrids){ container.innerHTML=""; }
     for(const [k,l] of INITIAL_TEXTS) mkInitText(k,l, ps[k]??"");
     for(const [k,l,step] of INITIAL_NUMS) mkInitNum(k,l,step, ps[k]);
 
     // LIVE CONTROLS
-    grid.innerHTML="";
-    for(const [k,l,mi,ma,st] of FIELDS) mkSliderRow(k,l,mi,ma,st, ps[k]);
-    for(const [k,l,opts] of SELECTS) mkSelectRow(k,l,opts, ps[k]);
+    if(liveControlsGrid){
+      liveControlsGrid.innerHTML="";
+      for(const [k,l,mi,ma,st] of FIELDS) mkSliderRow(k,l,mi,ma,st, ps[k]);
+      for(const [k,l,opts] of SELECTS) mkSelectRow(k,l,opts, ps[k]);
+    }
 
     // BLADE PARAMS
-    bladeGrid.innerHTML="";
-    for(const [k,l,step,min] of BLADE_FIELDS) mkBladeNum(k,l,step,min, ps[k]);
+    if(bladeGrid){
+      bladeGrid.innerHTML="";
+      for(const [k,l,step,min] of BLADE_FIELDS) mkBladeNum(k,l,step,min, ps[k]);
+    }
 
     // OSC CONTROLS
-    oscGrid.innerHTML = "";
-    for (const [k,l,opts] of OSC_SELECTS) mkOscSelectRow(oscGrid, k, l, opts, ps[k]);
-    for (const [k,l,mi,ma,st] of OSC_FIELDS) mkOscSliderRow(oscGrid, k, l, mi, ma, st, ps[k]);
-    for (const [k,l,mi,ma,st] of OSC_SINE_FIELDS) mkOscSliderRow(oscGrid, k, l, mi, ma, st, ps[k]);
-    for (const [k,l,mi,ma,st] of OSC_RANDOM_FIELDS) mkOscSliderRow(oscGrid, k, l, mi, ma, st, ps[k]);
+    if(oscGrid){
+      oscGrid.innerHTML = "";
+      for (const [k,l,opts] of OSC_SELECTS) mkOscSelectRow(oscGrid, k, l, opts, ps[k]);
+      for (const [k,l,mi,ma,st] of OSC_FIELDS) mkOscSliderRow(oscGrid, k, l, mi, ma, st, ps[k]);
+      for (const [k,l,mi,ma,st] of OSC_SINE_FIELDS) mkOscSliderRow(oscGrid, k, l, mi, ma, st, ps[k]);
+      for (const [k,l,mi,ma,st] of OSC_RANDOM_FIELDS) mkOscSliderRow(oscGrid, k, l, mi, ma, st, ps[k]);
+    }
 
     const sr=await fetch("/state"); const state=await sr.json();
     renderInfo(state); renderStatus(state); renderCoords(state); renderPT(state);
     renderBladeCounter(state); renderSchematic(state); renderYawViz(state);
+    renderBladeCounter(state); renderSchematic(state); renderYawViz(state);
+    renderSPTopView(state);   // ← add this
+
   }catch(e){ console.error(e); }
 }
 
@@ -1217,6 +1598,7 @@ setInterval(async ()=>{
     const sr=await fetch("/state"); const state=await sr.json();
     renderInfo(state); renderStatus(state); renderCoords(state); renderPT(state);
     renderBladeCounter(state); renderSchematic(state); renderYawViz(state);
+    renderSPTopView(state);
   }catch(e){}
 }, 250);
 
@@ -1347,7 +1729,7 @@ class ParamHTTPHandler(BaseHTTPRequestHandler):
 
         return self._send_text(404, {"error":"NOT FOUND"})
 
-def start_param_server(host="127.0.0.1", port=8888):
+def start_param_server(host="0.0.0.0", port=8888):
     httpd = HTTPServer((host, port), ParamHTTPHandler)
     print(f"[DASHBOARD] OPEN http://{host}:{port}")
     httpd.serve_forever()
@@ -1383,9 +1765,9 @@ def _update_blade_counters(active_now):
 
 # ===================== MAIN =====================
 if __name__ == "__main__":
-    threading.Thread(target=start_param_server, args=("127.0.0.1", 8888), daemon=True).start()
+    threading.Thread(target=start_param_server, args=("0.0.0.0", 8888), daemon=True).start()
 
-    foxglove.start_server(host="127.0.0.1", port=8765)
+    foxglove.start_server(host="0.0.0.0", port=8765)
     scene_ch = SceneUpdateChannel(topic="/scene")
     tf_ch = FrameTransformsChannel(topic="/tf")
 
