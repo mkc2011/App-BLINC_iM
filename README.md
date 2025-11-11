@@ -45,6 +45,13 @@ pip install foxglove-client pyyaml
 
 You'll see console logs confirming the Foxglove server, HTTP server, and asset loads.
 
+Tablet access: You can view the dashboard from a tablet. On iPad, use the Chrome browser and navigate to `http://<PC-IP>:8888`, replacing `<PC-IP>` with the IP address of the computer running the Python script.
+
+Finding your PC IP (for tablet access):
+- Windows: run `ipconfig` in PowerShell or Command Prompt and use the IPv4 Address of your active adapter (e.g., `192.168.x.x`).
+- macOS/Linux: run `ip addr show` (Linux) or `ifconfig` (macOS) and use the address on your primary interface.
+- Ensure the tablet is on the same network and that your firewall allows inbound access on port `8888` for Python.
+
 ## Scene & Control Flow
 - **Static Scene** (`build_scene_entities`):
   - Tower, nacelle, hub, nose cone, blades
@@ -108,6 +115,8 @@ Archive scripts reference the same assets directory; they're kept for historical
 
 ## Demo Video
 Place any screen recordings in `docs/media/` (e.g. `docs/media/blinc_im_walkthrough.mp4`) and link them here for easy reference.
+
+Demo video (Google Drive): https://drive.google.com/file/d/1j0dNNrlbGKR9Ewa-T64Gk8PHYNKztZfR/view?usp=drive_link
 
 ## Development Notes
 - Stick to ASCII for edits; avoid reintroducing non-ASCII debug glyphs.
