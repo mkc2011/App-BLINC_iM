@@ -11,6 +11,7 @@ web dashboard exposes live controls, state snapshots, and inline assets (logos).
 - Dual sensor rig on the tracker (Benewake + Livox) and optional SP scanner (S-Laser + camera).
 - Animated yaw oscillation with rate limiting.
 - HTTP API + dashboard panel (HTML/JS) with live telemetry and controls.
+- Dashboard theme toggle (light/dark) with persisted preference per browser.
 - Asset pipeline for GTMW/Pixxon logos, served directly by the dashboard.
 - Blade-hit counter based on frustum intersections.
 - Utility helpers for pan/tilt aiming, ENU->WGS84 conversion, bullseye geometry, and camera HUD mask.
@@ -51,6 +52,12 @@ Finding your PC IP (for tablet access):
 - Windows: run `ipconfig` in PowerShell or Command Prompt and use the IPv4 Address of your active adapter (e.g., `192.168.x.x`).
 - macOS/Linux: run `ip addr show` (Linux) or `ifconfig` (macOS) and use the address on your primary interface.
 - Ensure the tablet is on the same network and that your firewall allows inbound access on port `8888` for Python.
+
+## Dashboard Theming
+- The Overview/Controls header now exposes a `DARK MODE` toggle button; clicking it swaps the layout between `theme-light` and `theme-dark` instantly.
+- Your selection is stored client-side using `localStorage["blincThemePref"]`, so refreshes or tablet visits reuse the last theme per browser.
+- All inline SVG diagrams (SP view, schematic, yaw viz) and HUD chips automatically restyle for the active theme—no Python or Foxglove restart required.
+- Clear the key or press the button again to revert; the toggle affects only presentation, never telemetry.
 
 ## Scene & Control Flow
 - **Static Scene** (`build_scene_entities`):
@@ -122,6 +129,28 @@ Demo video (Google Drive): https://drive.google.com/file/d/1j0dNNrlbGKR9Ewa-T64G
 - Stick to ASCII for edits; avoid reintroducing non-ASCII debug glyphs.
 - Shared helper code is intentionally duplicated in legacy scripts; refactor into `src/common/` if you plan to maintain them.
 - Use `__pycache__/` in `.gitignore`.
+
+### Templated Dashboard (Separate Copy)
+- A separate Jinja2-based copy of the web dashboard is available for experimentation without touching the main app.
+- Files: `src/BLINC_iM_app_templated.py`, templates in `templates/` (`base.html`, `dashboard.html`).
+- Install Jinja2 if needed: `pip install jinja2`
+- Run: `python src/BLINC_iM_app_templated.py` (defaults to `http://localhost:8890/`).
+- Endpoints: `/` (HTML), `/get`, `/set?k=v`, `/state`, `/img/gt`, `/img/px`.
+- Note: This is a minimal demo of server-side templating and does not publish Foxglove topics.
+
+### Full App Copy (Separate Folder)
+- A separate entrypoint that runs the original app unchanged is provided in `src/full_app_copy/BLINC_iM_app_copy.py`.
+- Purpose: gives you an isolated start point without modifying `src/BLINC_iM_app.py`.
+- Run: `python src/full_app_copy/BLINC_iM_app_copy.py`
+- Behavior: identical to the original (HTTP dashboard on `:8888`, Foxglove publisher on `:8765`).
+
+### Full App Templated (Proxy UI)
+- A templated UI that proxies the original app is in `src/full_app_templated/BLINC_iM_app_templated_full.py`.
+- It starts the original script in the background and serves a Jinja2 dashboard.
+- Default ports: original `:8888` (unchanged), templated UI `:8891`.
+- Run: `python src/full_app_templated/BLINC_iM_app_templated_full.py` then open `http://localhost:8891/`.
+- Endpoints proxied: `/get`, `/set?k=v`, `/state`. Assets served locally at `/img/gt`, `/img/px`.
+- Notes: set `BLINC_ORIG_PORT` or `BLINC_TPL_PORT` env vars to customize ports.
 
 ## Troubleshooting
 - **Assets missing:** Check paths in `assets/`.
